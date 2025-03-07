@@ -8,6 +8,7 @@
 
 # if above fails use this:
 # pip install adafruit-circuitpython-vl53l0x
+# sudo pip3 install --break-system-packages adafruit-circuitpython-vl53l0x
 
 
 
