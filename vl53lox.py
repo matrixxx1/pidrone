@@ -9,8 +9,12 @@
 # if above fails use this:
 # pip install adafruit-circuitpython-vl53l0x
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 # sudo pip3 install --break-system-packages adafruit-circuitpython-vl53l0x
 
+=======
+# sudo apt install adafruit-circuitpython-vl53l0x
+>>>>>>> Stashed changes
 =======
 # sudo apt install adafruit-circuitpython-vl53l0x
 >>>>>>> Stashed changes
