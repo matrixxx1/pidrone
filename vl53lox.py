@@ -7,8 +7,7 @@
 # pip3 install adafruit-circuitpython-vl53l0x
 
 # if above fails use this:
-# pip install adafruit-circuitpython-vl53l0x. 
-Address
+# pip install adafruit-circuitpython-vl53l0x
 
 
 
