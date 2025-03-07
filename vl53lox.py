@@ -1,13 +1,15 @@
 
 
-/*
-
-sudo apt update
-sudo apt install python3-smbus python3-dev
-pip3 install adafruit-circuitpython-vl53l0x
 
 
-*/
+# sudo apt update
+# sudo apt install python3-smbus python3-dev
+# pip3 install adafruit-circuitpython-vl53l0x
+
+# if above fails use this:
+# pip install adafruit-circuitpython-vl53l0x. 
+Address
+
 
 
 import time
