@@ -26,6 +26,10 @@
 # sudo apt install adafruit-circuitpython-vl53l0x
 # sudo pip3 install --break-system-packages adafruit-circuitpython-vl53l0x
 
+#check if device attached to bus1
+# sudo i2cdetect -y 1
+#check if device attached to bus2
+# sudo i2cdetect -y 2
 
 
 import time
