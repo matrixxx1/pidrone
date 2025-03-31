@@ -1,4 +1,12 @@
+# if pip isnt setup, run this:
+# sudo apt-get install python-pip
+
 import RPi.GPIO as GPIO  # Imports the standard Raspberry Pi GPIO library
+# if not working, install this
+#  pip freeze | grep RPi
+# pip install RPi.GPIO
+
+
 from time import sleep   # Imports sleep (aka wait or pause) into the program
 import threading
 import datetime
