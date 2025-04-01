@@ -1,0 +1,42 @@
+<html> <head> <title>Moo's Drone</title> </head>
+            <body>
+            <script>
+            function updateImage(){
+              frontcam=document.getElementById("frontcam");
+              frontcam.src = "/?action=GetImage&value=cam/test.jpg&cacheBreaker=" + new Date().getTime();
+            }
+            
+            function updateMap(){
+              frontcam=document.getElementById("map");
+              frontcam.src = "/?action=GetMap&value=cam/test.jpg&cacheBreaker=" + new Date().getTime();
+            }   
+            </script>
+            <script>
+            function refreshCam(){
+                setTimeout(updateImage(), 1.0 * 5000);
+            }
+            
+              function refreshMap(){
+                setTimeout(updateMap(), 1.0 * 5000);
+            }
+            </script>
+            <Table><TR><TD valign='top'>
+                <h1>Commands</h1>
+                <ul>
+                <li><a href='?action='>Refresh</a></li>
+                 <li><a href='?action=TiltFrontCam&value=0'>WebCam-0 Degrees</a></li>
+                 <li><a href='?action=TiltFrontCam&value=45'>WebCam-45 Degrees</a></li>
+                 <li><a href='?action=TiltFrontCam&value=90'>WebCam-90 Degrees</a></li>
+                 <li><a href='?action=TiltFrontCam&value=135'>WebCam-135 Degrees</a></li>
+                 <li><a href='?action=TiltFrontCam&value=180'>WebCam-180 Degrees</a></li>
+                     <li><a href='?action=Motor1&value=0'>Motor1-0 </a></li>
+                 <li><a href='?action=Motor1&value=45'>Motor1-45 </a></li>
+                 <li><a href='?action=Motor1&value=90'>Motor1-90 </a></li>
+                 <li><a href='?action=Motor1&value=135'>Motor1-135 </a></li>
+                 <li><a href='?action=Motor1&value=180'>Motor1-180 </a></li>
+                  <li><a href='?action=Shutdown'>Shut Down</a></li> 
+                </ul></td><td >
+                <BR><BR></td><td valign='top'>
+       %showVals%
+
+</td></tr></table><BR> </body>        </html>

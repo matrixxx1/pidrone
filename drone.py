@@ -39,6 +39,15 @@ picam2.configure(camera_config)
 maxRange = 180
 servoFreq = 50
 
+
+class world:
+  def __init__(self):
+    self.x=[0,0,0,0,0,0,0,0,0,0]
+    self.y=[0,0,0,0,0,0,0,0,0,0]
+    self.z=[0,0,0,0,0,0,0,0,0,0]
+
+
+
 def getPWMByAngle(angle):
     return int(((angle / maxRange) * (10 +2) + 0) ) 
     #return (desiredAngle / maxDegrees) * (MaxPWM - MinPWM) + 0 = newPWM
@@ -121,41 +130,12 @@ class MyRequestHandler(BaseHTTPRequestHandler):
         # Parse the query string into a dictionary
         query_params = urllib.parse.parse_qs(query_string)
         
-        # Write the custom HTML content in the response
-        html_content = """
-        <html> <head> <title>Moo's Drone</title> </head>
-            <body>
-            <script>
-            function updateImage(){
-              frontcam=document.getElementById("frontcam");
-              frontcam.src = "/?action=GetImage&value=cam/test.jpg&cacheBreaker=" + new Date().getTime();
-            }
-            
-           
-            </script>
-            <script>
-            function refreshit(){
-                setTimeout(updateImage(), 1.0 * 5000);
-            }
-            </script>
-            <Table><TR><TD valign='top'>
-                <h1>Commands</h1>
-                <ul>
-                <li><a href='?action='>Refresh</a></li>
-                 <li><a href='?action=TiltFrontCam&value=0'>WebCam-0 Degrees</a></li>
-                 <li><a href='?action=TiltFrontCam&value=45'>WebCam-45 Degrees</a></li>
-                 <li><a href='?action=TiltFrontCam&value=90'>WebCam-90 Degrees</a></li>
-                 <li><a href='?action=TiltFrontCam&value=135'>WebCam-135 Degrees</a></li>
-                 <li><a href='?action=TiltFrontCam&value=180'>WebCam-180 Degrees</a></li>
-                     <li><a href='?action=Motor1&value=0'>Motor1-0 </a></li>
-                 <li><a href='?action=Motor1&value=45'>Motor1-45 </a></li>
-                 <li><a href='?action=Motor1&value=90'>Motor1-90 </a></li>
-                 <li><a href='?action=Motor1&value=135'>Motor1-135 </a></li>
-                 <li><a href='?action=Motor1&value=180'>Motor1-180 </a></li>
-                  <li><a href='?action=Shutdown'>Shut Down</a></li> 
-                </ul></td><td >
-                <BR><BR></td><td valign='top'>
-        """
+        
+        #get custom html
+        with open('html/menu.html', 'r') as file:
+            html_content = file.read()
+    
+      
         
         action = query_params.get('action',[''])[0]
         value1 = query_params.get('value',[''])[0]
@@ -165,37 +145,62 @@ class MyRequestHandler(BaseHTTPRequestHandler):
         value5 = query_params.get('value5',[''])[0]
         
         showVals = ""
-        
-        if action=="GetImage":
-            getImage=SnapFrontCam()
-            
-            drawOnImage(getImage, 10, 20, getDebug())
-            #showVals = "<img id='frontcam' width='1000' height='800' src='?action=GetImage&value=" + getImage + "'>"
-            self.send_response(200)
-            self.send_header('Content-type', 'image/jpeg')
-            self.end_headers()
-            with open(getImage, 'rb') as content:
-                shutil.copyfileobj(content, self.wfile)
-        else:
-            match action:
-                case "":
-                    #do nothing
-                    print("Blank action")
-                case "Shutdown":
-                    serverRunning=False
-                    shutDown()
-                case "TiltFrontCam":
-                    tiltFrontCam(int(value1))
-                case "Motor1":
-                    motor1(int(value1))                
-                case _:
-                    print("Unhandled action")
+       
+        doMenu=""
+         
+        match action:
+            case "":
+                #do nothing
+                print("Blank action")
+                doMenu="yes"
+            case "GetImage":
+                print("GetImage")
+                getImage=SnapFrontCam()
+                drawOnImage(getImage, 10, 20, getDebug())
+                #showVals = "<img id='frontcam' width='1000' height='800' src='?action=GetImage&value=" + getImage + "'>"
+                self.send_response(200)
+                self.send_header('Content-type', 'image/jpeg')
+                self.end_headers()
+                with open(getImage, 'rb') as content:
+                    shutil.copyfileobj(content, self.wfile)
+                doMenu="no"
+            case "GetMap":
+                print("GetMap")
+                self.send_response(200)
+                self.send_header('Content-type', 'text/html')
+                self.end_headers() 
+                #with open('map.text', 'r') as file:
+                #    map_content = file.read()
+                map_content = "thi is the MAP - test"
+                #map_content.replace(" ","&nbsp;")
+                #map_content.replace("\n","<BR>")
+                self.wfile.write(map_content.encode('utf-8'))
+                self.end_headers()
+                doMenu="no"
+            case "Shutdown":
+                print("ShutDown")
+                serverRunning=False
+                shutDown()
+                doMenu="yes"
+            case "TiltFrontCam":
+                print("TiltFrontCam")
+                tiltFrontCam(int(value1))
+                doMenu="yes"
+            case "Motor1":
+                print("Motor1")
+                motor1(int(value1))
+                doMenu="yes"
+            case _:
+                print("Unhandled action")
+                doMenu="yes"
           
+        if (doMenu=="yes"):
             self.send_header('Content-type', 'text/html')
             self.end_headers()  
             showVals = showVals + '<BR>Action=' + action + " (Value1=" + value1 + ", Value2=" +  value2 + ", Value3=" +  value3 + ", Value4=" +  value4  + ", Value5=" +  value5 + ")<BR>"
-            showVals = showVals + '<BR><img id="frontcam" width="1400" height="800" src="?action=GetImage" onload="refreshit()" />'
-            html_content = html_content + showVals + "</td></tr></table><BR> </body>        </html>"
+            showVals = showVals + '<BR><img id="frontcam" width="1400" height="800" src="?action=GetImage" onload="refreshCam()" />'
+            showVals = showVals + '<BR><iframe id="map" width="800" height="300" src="?action=GetMap" onload="refreshMap()"></iframe>'
+            html_content = html_content.replace("%showVals%", showVals)
             self.wfile.write(html_content.encode('utf-8'))
 
 
