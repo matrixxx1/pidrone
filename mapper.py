@@ -375,23 +375,23 @@ class webRequestHandler(BaseHTTPRequestHandler):
                             if (safeToMove(drone.x+ 1,drone.y,drone.z )==True):
                                 droneActions= droneActions + ", x+ axis attempt to avoid collision at max height"
                                 actiondone=True
-                                drone.z=drone.x + 1
+                                drone.x=drone.x + 1
                             else:
                                 if (safeToMove(drone.x -1,drone.y,drone.z )==True):
                                     droneActions= droneActions + ", x- axis attempt to avoid collision at max height"
                                     actiondone=True
-                                    drone.z=drone.x - 1
+                                    drone.x=drone.x - 1
                                 else:
                                     droneActions= droneActions + ", Unable to use x axis to avoid obstacle"
                                     if (safeToMove(drone.x,drone.y+1,drone.z)==True):
                                         droneActions= droneActions + ", y+ axis attempt to avoid collision at max height"
                                         actiondone=True
-                                        drone.z=drone.y + 1
+                                        drone.y=drone.y + 1
                                     else:
                                         if (safeToMove(drone.x,drone.y-1,drone.z)==True):
                                             droneActions= droneActions + ", y-axis attempt to avoid collision at max height"
                                             actiondone=True
-                                            drone.z=drone.y - 1
+                                            drone.y=drone.y - 1
                                         else:
                                             droneActions= droneActions + ",  All paths x,y,z blocked"
                                             actiondone=True
