@@ -1,3 +1,4 @@
+import random
 import http
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -12,17 +13,45 @@ leftpad = blocksize      /2
        
       
 defaultFlightHeight = 10
-      
-worldX=60
-worldY=30
-worldZ=15
-     
-     
-     
+maxFlightHeight = 15
+
+
+theWorld = [] 
+knownobjs= []         
 longTermGoalAchieved=False
 droneActions=""
+query_string="" 
+action = ""
+value1 = ""
+value2 = ""
+value3 = ""
+value4 = ""
+value5 = ""
+value6 = "" 
+world = ""
+drone=""
+base="" 
+ 
+def loadQS():
+    global action
+    global value1
+    global value2
+    global value3
+    global value4
+    global value5
+    global value6
+    global query_string
+    query_params = urllib.parse.parse_qs(query_string)
+    action = query_params.get('action',[''])[0]
+    value1 = query_params.get('value',[''])[0]
+    value2 = query_params.get('value2',[''])[0]
+    value3 = query_params.get('value3',[''])[0]
+    value4 = query_params.get('value4',[''])[0]
+    value5 = query_params.get('value5',[''])[0]
+    value6 = query_params.get('value6',[''])[0]
+     
 
-class object():
+class obj():
     def __init__(self, name, x, y,z, color):
         self.name=name
         self.x = x
@@ -37,81 +66,71 @@ class object():
         top = (self.x * blocksize)   + padtop - (self.z * heightpad) 
         left = (self.y  * blocksize)  + padleft - (self.z  * leftpad)
         retval = ""
-        retval = retval + "\n<div  style='position: absolute; top: " + str(top+6) + ";   left: " + str(left +6) + ";  z-index: " + str(self.z) + ";  "
-        retval = retval  + " background-color: " + self.color + ";'   class='mcellsha'></div>\n"
-        retval = retval + "\n<div  style='position: absolute; top: " + str(top+3) + ";   left: " + str(left +3) + ";  z-index: " + str(self.z) + ";  "
-        retval = retval  + " background-color: " + self.color + ";'   class='mcellsha'></div>\n" 
+        if (self.name!="ground"):
+            retval = retval + "\n<div  style='position: absolute; top: " + str(top+6) + ";   left: " + str(left +6) + ";  z-index: " + str(self.z) + ";  "
+            retval = retval  + " background-color: " + self.color + ";'   class='shad'></div>\n"
+            retval = retval + "\n<div  style='position: absolute; top: " + str(top+4) + ";   left: " + str(left +4) + ";  z-index: " + str(self.z) + ";  "
+            retval = retval  + " background-color: " + self.color + ";'   class='shad'></div>\n"
+            retval = retval + "\n<div  style='position: absolute; top: " + str(top+2) + ";   left: " + str(left +4) + ";  z-index: " + str(self.z) + ";  "
+            retval = retval  + " background-color: " + self.color + ";'   class='shad'></div>\n"
+            
         retval = retval + "\n <div onclick='setDest(" + str(self.x) + "," + str(self.y) +  "," + str(self.z + 1) + ")' "
         retval = retval + "\n title='name: " + self.name + ", x: " + str(self.x) +", y: " + str(self.y) + ", z: " + str(self.z) + "' "
         retval = retval + "\n style='position: absolute; top: " + str(top) + ";   left: " + str(left) + ";  z-index: " + str(self.z) + ";  "
         retval = retval  + " background-color: " + self.color + ";'   class='mcellobj'></div>\n" 
 
         return retval
+ 
+
+  
+
+def createObstacles():
+    global knownobjs
     
-#worldx = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
-#worldy = [worldx,worldx,worldx,worldx,worldx,worldx,worldx,worldx,worldx,worldx,worldx,worldx,worldx,worldx,worldx,worldx,worldx,worldx,worldx,worldx,worldx,worldx,worldx,worldx]
-#worldz = [worldy,worldy,worldy,worldy,worldy,worldy,worldy,worldy,worldy]
-   
-theWorld = []
+    #make some trees
+    howManyTrees = random.randint(1, 30)
+    for treeLoop in range(howManyTrees):
+        thex = random.randint(1, world.x -1)
+        they = random.randint(1, world.y -1)
+        theheight = random.randint(1, world.z -1) 
+        for theheight in range(world.z-1):
+            knownobjs.append(obj("tree",thex,they,theheight+1,"green"))
 
-for y in range(worldX):
-    for x in range(worldY):
-        for z in range(worldZ):
-            worldPoint = object("",x,y,worldZ - z,"")
-            theWorld.append(worldPoint)
-           
+    #make a large wall that can be flown over
+    for theheight in range(10):
+        for wall in range(15):
+            knownobjs.append(obj("wall",wall,15,theheight+1,"black"))
+            knownobjs.append(obj("wall",wall,16,theheight+1,"black"))
+
+#make a large wall that cant be flown over
+    for theheight in range(defaultFlightHeight + 5):
+        for wall in range(15):
+            knownobjs.append(obj("wall",wall,25,theheight+1,"black"))
+            knownobjs.append(obj("wall",wall,25,theheight+1,"black"))
+               
             
-drone = object("drone",11,11,8,"blue")        
-base = object("base",2,3,2,"red")
-
-
-knownObjects= []
-
-knownObjects.append(drone)
-knownObjects.append(base)
-
-for y in range(worldX):
-    for x in range(worldY):
-        worldPoint = object("ground",x,y,1,"green")
-        knownObjects.append(worldPoint)  
-
-
-        
-for x in range(6):
-    knownObjects.append(object("tree",5,5,x+1,"black"))
-    knownObjects.append(object("tree",15,15,x+1,"black"))
-    knownObjects.append(object("tree",10,10,x+1,"black"))
-
-
-        
-for x in range(6):
-    knownObjects.append(object("tree",16,5,x+1,"black"))
-    knownObjects.append(object("tree",25,15,x+1,"black"))
-    knownObjects.append(object("tree",22,10,x+1,"black"))
-
-
-for x in range(3):
-    for y in range(10):
-        knownObjects.append(object("tree",25,y,x+1,"black"))
-        knownObjects.append(object("tree",15,x+y,x+1,"black"))
-        knownObjects.append(object("tree",20,y,x+1,"black"))
-
-
-for x in range(3):
-    for y in range(10):
-        knownObjects.append(object("tree",5,y,x+1,"black"))
-        knownObjects.append(object("tree",15,y,x+1,"black"))
-        knownObjects.append(object("tree",10,y,x+1,"black"))
-
+            
 def safeToMove(x,y,z):
-    for objs in knownObjects:
+    if (z> maxFlightHeight):
+        return False
+    for objs in knownobjs:
         if (objs.name!="drone"):
             if (objs.x==x and objs.y==y and objs.z==z):
                 print("Near collision with " + objs.getLabel())
                 return False
     return True
     
-def renderActions(self, droneActions,longTermGoalAchieved):
+def renderActions(self):
+    global longTermGoalAchieved
+    global droneActions
+    global action
+    global value1
+    global value2
+    global value3
+    global value4
+    global value5
+    global value6
+    
     parsed_path = urllib.parse.urlparse(self.path)
     query_string = parsed_path.query
          
@@ -119,13 +138,8 @@ def renderActions(self, droneActions,longTermGoalAchieved):
         
     query_params = urllib.parse.parse_qs(query_string)
         
-    action = query_params.get('action',[''])[0]
-    value1 = query_params.get('value',[''])[0]
-    value2 = query_params.get('value2',[''])[0]
-    value3 = query_params.get('value3',[''])[0]
-    value4 = query_params.get('value4',[''])[0]
-    value5 = query_params.get('value5',[''])[0]
-    value6 = query_params.get('value6',[''])[0]
+
+    
     retval = ""
     if (longTermGoalAchieved==True):
         action=""
@@ -139,7 +153,11 @@ def renderActions(self, droneActions,longTermGoalAchieved):
     retval = retval + "\n <BR>Drone actions: " + droneActions + "<BR><BR>"
     retval = retval + "\n <a href='/?action=move&value=left'><</a> | <a href='/?action=move&value=right'>></a> | "
     retval = retval + "\n <a href='/?action=move&value=up'> /\\ </a> | <a href='/?action=move&value=down'>\\/</a> | "
-    retval = retval + "\n<a href='/?action=move&value=higher'>H</a> | <a href='/?action=move&value=lower'>L</a> "
+    retval = retval + "\n <a href='/?action=move&value=higher'>H</a> | <a href='/?action=move&value=lower'>L</a> "
+    
+    retval = retval + "\n | <a href='/?action=randomworld'>Randomize World</a>   "
+    
+    
     retval = retval + "\n<BR><BR> Action: <input type='text' id='action' class='ip'  value='" + action + "'> \n"
     retval = retval + "\n Value1: <input type='text' id='value' class='ip' value='" + value1 + "'> "
     retval = retval + "\n Value2: <input type='text' id='value2' class='ip' value='" + value2 + "'> "
@@ -162,13 +180,13 @@ def renderScripts(self):
     retval = retval + "\n setTimeout(autoPilot, 2000); \n </script>"
     return retval
 
-def renderWorld(self,droneActions,longTermGoalAchieved):
+def renderWorld(self):
     #let timeoutId = setTimeout(greet, 2000, "World")
-    response_content = "<BR>" + drone.getLabel() + "  " + renderActions(self,droneActions,longTermGoalAchieved)
+    response_content = "<BR>" + drone.getLabel() + "<BR> World Size - x: " + str(world.x) + ", y: " + str(world.y) + ", z: " + str(world.z) + "  <BR>" + renderActions(self)
     response_content = response_content + "\n<BR><BR><BR><BR><BR>\n"
     response_content = response_content + "\n<style> .mcell {  border: 1px dashed yellow; opacity: 0.8; transform-style: preserve-3d; transform: translateY(-10px) rotateX(65deg);   width: " + str(blocksize) + "px; height: " + str(blocksize) + "px;} </style>"
-    response_content = response_content + "\n<style> .mcellobj {      border: 1px dashed red;  width: " + str(blocksize) + "px; height: " + str(blocksize) + "px;} </style>"
-    response_content = response_content + "\n<style> .mcellsha {      border-bottom: 2px solid black; border-right: 2px solid black;  width: " + str(blocksize) + "px; height: " + str(blocksize) + "px;} </style>"
+    response_content = response_content + "\n<style> .mcellobj {      border: 1px dashed red; border-bottom: 2px solid black; border-right: 2px solid black; width: " + str(blocksize) + "px; height: " + str(blocksize) + "px;} </style>"
+    response_content = response_content + "\n<style> .shad {      border-top: 2px solid black; border-left: 2px solid black;  width: " + str(blocksize) + "px; height: " + str(blocksize) + "px;} </style>"
     response_content = response_content + "\n<style> .ip {   width: 60px;   } </style>"
 
     
@@ -176,17 +194,73 @@ def renderWorld(self,droneActions,longTermGoalAchieved):
     top=0
     left = 0
     classes = ""        
-    for checkz in range(worldZ):
-        z = worldZ - checkz
-        response_content = response_content + "\n<div class='.mcell' style='position: absolute; width: " + str(worldX * blocksize) + "px;  height: " + str(worldY * blocksize) + "px'>"
-        for objs in knownObjects:
+    for checkz in range(world.z):
+        z = world.z - checkz
+        response_content = response_content + "\n<div class='.mcell' style='position: absolute; width: " + str(world.x * blocksize) + "px;  height: " + str(world.y * blocksize) + "px'>"
+        for objs in knownobjs:
             if (objs.z==z):
                 response_content = response_content + objs.renderIt() 
         response_content = response_content + "\n</div> "
     return response_content
-  
-class CustomHandler(BaseHTTPRequestHandler):
+
+
+
+def seedWorld():
+    global world
+    global drone
+    global base
+    global knownobjs
+    global action
+    global droneActions
+    global theWorld
+    
+    world = obj("world",60,30,15,"")
+    
+    theWorld=[]
+    for y in range(world.y):
+        for x in range(world.x):
+            for z in range(world.z):
+                worldPoint = obj("",x,y,world.z - z,"")
+                theWorld.append(worldPoint)
+    
+    knownobjs = []
+    for y in range(world.y):
+        for x in range(world.x):
+            worldPoint = obj("ground",x,y,1,"gray")
+            knownobjs.append(worldPoint) 
+    createObstacles()
+
+    drone = obj("drone",11,11,8,"blue")        
+    base = obj("base",2,3,2,"red")
+    knownobjs.append(drone)
+    knownobjs.append(base)
+    action=""
+    droneActions="Randomizing world"
+     
+     
+seedWorld()
+
+
+def isNearXY(obj1,obj2):
+    if (obj1.x==obj2.x or obj1.x+1==obj2.x or obj1.x-1==obj2.x):
+        if (obj1.y==obj2.y or obj1.y+1==obj2.y or obj1.y-1==obj2.y):
+          return True
+    return False
+
+class webRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
+        global longTermGoalAchieved
+        global droneActions
+        global world
+        global query_string
+        global action
+        global value1
+        global value2
+        global value3
+        global value4
+        global value5
+        global value6
+        
         longTermGoalAchieved=False
         
         self.send_response(200)
@@ -195,75 +269,138 @@ class CustomHandler(BaseHTTPRequestHandler):
          
         parsed_path = urllib.parse.urlparse(self.path)
         query_string = parsed_path.query
-         
+        loadQS()
         # Parse the query string into a dictionary
         
-        query_params = urllib.parse.parse_qs(query_string)
+       
         
-        action = query_params.get('action',[''])[0]
-        value1 = query_params.get('value',[''])[0]
-        value2 = query_params.get('value2',[''])[0]
-        value3 = query_params.get('value3',[''])[0]
-        value4 = query_params.get('value4',[''])[0]
-        value5 = query_params.get('value5',[''])[0]
-        value6 = query_params.get('value6',[''])[0]
-        
+        if (action=="randomworld"):
+            seedWorld()
+            
         if (action=="ap"):
              actiondone=False
-
-             if (int(value4) == drone.x and int(value5) == drone.y and  drone.z < defaultFlightHeight and actiondone==False):                
-                if (safeToMove(drone.x,drone.y,drone.z + 1)==True):
-                    drone.z=drone.z + 1
-                    actiondone=True
-                    droneActions="Gaining elevation to safe flight height"
-                else:
-                    actiondone=True  
-                    droneActions="Avoiding collisionon z axis"
-                
-             if (int(value1) < drone.x and actiondone==False):
+             droneActions= ""
+             xBlocked=False
+             yBlocked=False
+             zBlocked=False
+             
+             if (int(value1) < drone.x):
                 if (safeToMove(drone.x - 1,drone.y,drone.z )==True):
                     drone.x=drone.x - 1
                     actiondone=True
-                    droneActions="Moving to destination on x axis"
+                    droneActions= droneActions + ", Moving to destination on x axis"
+                    xBlocked=False
                 else:
-                    actiondone=True  
-                    droneActions="Avoiding collisionon x axis"
+                    actiondone=False  
+                    droneActions= droneActions + ", Avoiding -collision on x axis"
+                    xBlocked=True
                     
-             if (int(value1) > drone.x and actiondone==False):
+             if (int(value1) > drone.x):
                 if (safeToMove(drone.x + 1,drone.y,drone.z )==True):
                     drone.x=drone.x + 1
                     actiondone=True
-                    droneActions="Moving to destination on x axis"
+                    droneActions= droneActions + ", Moving to destination on x axis"
+                    xBlocked=False
                 else:
-                    actiondone=True  
-                    droneActions="Avoiding collisionon x axis"
+                    actiondone=False  
+                    droneActions= droneActions + ", Avoiding +collision on x axis"
+                    xBlocked=True
                 
-             if (int(value2) > drone.y and actiondone==False):
+             if (int(value2) > drone.y):
                 if (safeToMove(drone.x ,drone.y + 1,drone.z )==True):
                     drone.y=drone.y + 1
                     actiondone=True
-                    droneActions="Moving to destination on y axis"
+                    droneActions= droneActions + ", Moving to destination on y axis"
+                    yBlocked=False
                 else:
-                    actiondone=True  
-                    droneActions="Avoiding collisionon y axis"
+                    actiondone=False  
+                    droneActions= droneActions + ", Avoiding +collision on y axis"
+                    yBlocked=True
                     
-             if (int(value2) < drone.y and actiondone==False):
+             if (int(value2) < drone.y):
                 if (safeToMove(drone.x ,drone.y - 1,drone.z )==True):
                     drone.y=drone.y - 1
                     actiondone=True
-                    droneActions="Moving to destination on y axis"
+                    droneActions= droneActions + ", Moving to destination on y axis"
+                    yBlocked=False
                 else:
-                    actiondone=True  
-                    droneActions="Avoiding collisionon y axis"
+                    actiondone=False  
+                    droneActions= droneActions + ", Avoiding -collision on y axis"
+                    yBlocked=True
+             
+             # if drone is near destination
+             if (isNearXY(drone,obj("dest",int(value1),int(value2),int(value3),""))==True):
+                 
+                 if (int(value3) < drone.z):
+                    if (safeToMove(drone.x,drone.y,drone.z - 1)==True):
+                        droneActions= droneActions + ", Lowering drone to destination"
+                        actiondone=True
+                        drone.z=drone.z - 1
+                        zBlocked=False
+                    else:
+                        actiondone=False  
+                        droneActions= droneActions + ", Avoiding -collision on z axis"
+                        zBlocked=True
+                        
+                 if (int(value3) > drone.z):
+                    if (safeToMove(drone.x,drone.y,drone.z + 1)==True):
+                        droneActions= droneActions + ", Raising drone to destination"
+                        actiondone=True
+                        drone.z=drone.z + 1
+                    else:
+                        actiondone=False  
+                        droneActions= droneActions + ", Avoiding +collision on z axis"
+                        zBlocked=True
+             else:
+                if (drone.z < defaultFlightHeight):
+                    if (safeToMove(drone.x,drone.y,drone.z + 1)==True):
+                        drone.z=drone.z + 1
+                        actiondone=True
+                        droneActions= droneActions + ", Gaining elevation to safe flight height"
+                        zBlocked=False
+                    else:
+                        actiondone=False  
+                        droneActions= droneActions + ", Avoiding collision on z axis"
+                        zBlocked=True
+                        
+             if (actiondone==False):
+                 if (xBlocked==True or yBlocked==True):
+                     if (zBlocked==False):                         
+                        if (safeToMove(drone.x,drone.y,drone.z + 1)==True):
+                            droneActions= droneActions + ", Raising drone to avoid obstacle"
+                            actiondone=True
+                            drone.z=drone.z + 1
+                        else:
+                            droneActions= droneActions + ", Drone unable to fly over obstacle"
+                            if (safeToMove(drone.x+ 1,drone.y,drone.z )==True):
+                                droneActions= droneActions + ", x+ axis attempt to avoid collision at max height"
+                                actiondone=True
+                                drone.z=drone.x + 1
+                            else:
+                                if (safeToMove(drone.x -1,drone.y,drone.z )==True):
+                                    droneActions= droneActions + ", x- axis attempt to avoid collision at max height"
+                                    actiondone=True
+                                    drone.z=drone.x - 1
+                                else:
+                                    droneActions= droneActions + ", Unable to use x axis to avoid obstacle"
+                                    if (safeToMove(drone.x,drone.y+1,drone.z)==True):
+                                        droneActions= droneActions + ", y+ axis attempt to avoid collision at max height"
+                                        actiondone=True
+                                        drone.z=drone.y + 1
+                                    else:
+                                        if (safeToMove(drone.x,drone.y-1,drone.z)==True):
+                                            droneActions= droneActions + ", y-axis attempt to avoid collision at max height"
+                                            actiondone=True
+                                            drone.z=drone.y - 1
+                                        else:
+                                            droneActions= droneActions + ",  All paths x,y,z blocked"
+                                            actiondone=True
+                                         
+                     else:
+                         droneActions= droneActions + ", All paths blocked" 
+                             
+                     
                 
-             if (int(value3) < drone.z and actiondone==False):
-                droneActions="Lowering drone to destination"
-                actiondone=True
-                drone.z=drone.z - 1 
-             if (int(value3) > drone.z and actiondone==False):
-                droneActions="Raising drone to destination"
-                actiondone=True
-                drone.z=drone.z + 1
              if (int(value1) == drone.x and int(value2) == drone.y and int(value3) == drone.z and actiondone==False):
                 droneActions="Drone has landed, autopilot complete"
                 actiondone=True
@@ -283,15 +420,15 @@ class CustomHandler(BaseHTTPRequestHandler):
             if (value1=="left"):
                drone.x=drone.x - 1
         
-        knownObjects.pop(0)
-        knownObjects.insert(0,drone)
+        knownobjs.pop(0)
+        knownobjs.insert(0,drone)
 
-        response_content = renderWorld(self,droneActions,longTermGoalAchieved) + renderScripts(self)
+        response_content = renderWorld(self) + renderScripts(self)
                  
         #response_content = "<html><body><h1>Hello, World!</h1></body></html>"
         self.wfile.write(response_content.encode())
 
-def run(server_class=HTTPServer, handler_class=CustomHandler, port=8001):
+def run(server_class=HTTPServer, handler_class=webRequestHandler, port=8001):
    server_address = ('', port)
    httpd = server_class(server_address, handler_class)
    print(f"Starting server on port {port}...")
