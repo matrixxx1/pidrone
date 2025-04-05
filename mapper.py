@@ -5,6 +5,9 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import urllib.parse
 
 
+perspectiveX="left"    #left or right
+perspectiveY="bottom"  #top or bottom
+
 blocksize = 15
 padtop= 70
 padleft=70
@@ -63,8 +66,21 @@ class obj():
         return self.name + " coords: x: " + str(self.x) +", y: " + str(self.y) + ", z: " + str(self.z)
 
     def renderIt(self):
-        top = (self.x * blocksize)   + padtop - (self.z * heightpad) 
-        left = (self.y  * blocksize)  + padleft - (self.z  * leftpad)
+        global perspectiveX
+        global perspectiveY
+        
+        left = (self.y  * blocksize)  + padleft
+        top = (self.x * blocksize)   + padtop
+        
+        if (perspectiveX=="right"):            
+            left = (self.y  * blocksize)  + padleft - (self.z  * leftpad)
+        if (perspectiveX=="left"):            
+            left = (self.y  * blocksize)  + padleft + (self.z  * leftpad)
+        if (perspectiveY=="top"):
+            top = (self.x * blocksize)   + padtop + (self.z * heightpad)             
+        if (perspectiveY=="bottom"):
+            top = (self.x * blocksize)   + padtop - (self.z * heightpad)
+            
         retval = ""
         opacity=".1"
         if (self.name=="drone" or self.name=="ground" or self.name=="base"):
@@ -93,14 +109,26 @@ def createObstacles():
     global knownobjs
     
     #make some trees
-    howManyTrees = random.randint(1, 30)
+    howManyTrees = random.randint(2, 7)
     for treeLoop in range(howManyTrees):
         thex = random.randint(1, world.x -1)
         they = random.randint(1, world.y -1)
-        theheight = random.randint(1, world.z -1) 
-        for theheight in range(world.z-1):
-            knownobjs.append(obj("tree",thex,they,theheight+1,"green"))
-
+        treeHeightRND = random.randint(5, world.z -1) 
+        
+        for thisLevel in range(treeHeightRND):
+            treeHeight = treeHeightRND - thisLevel
+            # place top of tree
+            knownobjs.append(obj("tree",thex  ,they ,treeHeightRND,"green"))
+            #create growing layers until hitting ground
+            for thisLayerRange in range(thisLevel -1):
+                #create next layer
+                knownobjs.append(obj("tree",thex + thisLayerRange ,they ,treeHeight,"green"))
+                knownobjs.append(obj("tree",thex - thisLayerRange ,they ,treeHeight,"green"))
+                knownobjs.append(obj("tree",thex  ,they + thisLayerRange,treeHeight,"green"))
+                knownobjs.append(obj("tree",thex  ,they - thisLayerRange,treeHeight,"green"))
+            
+             
+                
     #make a few large walls that can be flown over
     for theheight in range(10):
         for wall in range(15):
