@@ -3,28 +3,36 @@ import http
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import urllib.parse
+ 
 
+import helpers_html as html
 
+#this determines how the world will be rendered to the browser
 perspectiveX="left"    #left or right
 perspectiveY="bottom"  #top or bottom
 
-blocksize = 15
-padtop= 70
-padleft=70
-heightpad = blocksize / 2
-leftpad = blocksize      /2   
+
+blocksize = 14 #how many pixels wide and tall a block is in the world. a block represents a cubic meter
+padtop= 70 # where to start rendering the world on the up/down axis
+padleft=70 # where to start rendering the world on the left/right axis
+
+#when rendering to imply height difference, how much shift should occur
+heightpad = blocksize / 2 # up/down
+leftpad = blocksize      /2   #left/right
        
       
-defaultFlightHeight = 10
-maxFlightHeight = 15
+defaultFlightHeight = 10 # prefered height that the drone should fly
+maxFlightHeight = 15 # max height the drone is allowed to achieve
 
 
-theWorld = [] 
-knownobjs= []         
-longTermGoalAchieved=False
-droneActions=""
-query_string="" 
-action = ""
+theWorld = [] #this array contains the world... literally. it is an array of arrays of arrays (x,y,z) 
+knownObjs= [] #this is an array of known objects. this contains the drone, the base, objects found, etc       
+
+longTermGoalAchieved=False # this is the trigger for if the long term goal has been achieved
+droneActions="" # this is a variable that stores the actions the drone is taking during this iteration
+
+query_string="" # this holds the query string that is in use for this request 
+action = "" # this is the first param passed in url usually. it defines the action that will take place
 value1 = ""
 value2 = ""
 value3 = ""
@@ -86,28 +94,28 @@ class obj():
         if (self.name=="drone" or self.name=="ground" or self.name=="base"):
             opacity="1"
         
+        #render extra divs to give it a 3d look
         if (self.name!="ground" and self.name!="drone" and self.name!="base"):
-            retval = retval + "\n<div  style='opacity: " + opacity + "; position: absolute; top: " + str(top+6) + ";   left: " + str(left +6) + ";  z-index: " + str(self.z) + ";  "
-            retval = retval  + " background-color: " + self.color + ";'   class='shad'></div>\n"
-            retval = retval + "\n<div  style='opacity: " + opacity + "; position: absolute; top: " + str(top+4) + ";   left: " + str(left +4) + ";  z-index: " + str(self.z) + ";  "
-            retval = retval  + " background-color: " + self.color + ";'   class='shad'></div>\n"
-            retval = retval + "\n<div  style='opacity: " + opacity + "; position: absolute; top: " + str(top+2) + ";   left: " + str(left +4) + ";  z-index: " + str(self.z) + ";  "
-            retval = retval  + " background-color: " + self.color + ";'   class='shad'></div>\n"
+            retval = retval + "\n<div  style='opacity: " + opacity + "; position: absolute; top: " + str(top+6) + "; left: " + str(left +6) + "; z-index: " + str(self.z) + "; background-color: " + self.color + ";' class='shad'></div>\n"
+            retval = retval + "\n<div  style='opacity: " + opacity + "; position: absolute; top: " + str(top+4) + "; left: " + str(left +4) + "; z-index: " + str(self.z) + "; background-color: " + self.color + ";' class='shad'></div>\n"
+            retval = retval + "\n<div  style='opacity: " + opacity + "; position: absolute; top: " + str(top+2) + "; left: " + str(left +4) + "; z-index: " + str(self.z) + "; background-color: " + self.color + ";' class='shad'></div>\n"
             opacity=".5"
-            
-        retval = retval + "\n <div onclick='setDest(" + str(self.x) + "," + str(self.y) +  "," + str(self.z + 1) + ")' "
-        retval = retval + "\n title='name: " + self.name + ", x: " + str(self.x) +", y: " + str(self.y) + ", z: " + str(self.z) + "' "
-        retval = retval + "\n style='opacity: " + opacity + "; position: absolute; top: " + str(top) + ";   left: " + str(left) + ";  z-index: " + str(self.z) + ";  "
-        retval = retval  + " background-color: " + self.color + ";'   class='mcellobj'></div>\n" 
+        
+        #render the actual object
+        retval = retval + "\n <div onclick='setDest(" + str(self.x) + "," + str(self.y) +  "," + str(self.z + 1) + ")' title='name: " + self.name + ", x: " + str(self.x) +", y: " + str(self.y) + ", z: " + str(self.z) + "' "
+        retval = retval + " style='opacity: " + opacity + "; position: absolute; top: " + str(top) + ";   left: " + str(left) + ";  z-index: " + str(self.z) + ";  "
+        retval = retval  + " background-color: " + self.color + ";'   class='mcellobj'></div>" 
 
         return retval
  
-
+def addKnownObject(theObj):
+    global knownObjs
+    knownObjs.append(theObj)
+    
   
 
 def createObstacles():
-    global knownobjs
-    
+   
     #make some trees
     howManyTrees = random.randint(2, 7)
     for treeLoop in range(howManyTrees):
@@ -118,41 +126,41 @@ def createObstacles():
         for thisLevel in range(treeHeightRND):
             treeHeight = treeHeightRND - thisLevel
             # place top of tree
-            knownobjs.append(obj("tree",thex  ,they ,treeHeightRND,"green"))
+            addKnownObject(obj("tree",thex  ,they ,treeHeightRND,"green"))
             #create growing layers until hitting ground
             for thisLayerRange in range(thisLevel -1):
                 #create next layer
-                knownobjs.append(obj("tree",thex + thisLayerRange ,they ,treeHeight,"green"))
-                knownobjs.append(obj("tree",thex - thisLayerRange ,they ,treeHeight,"green"))
-                knownobjs.append(obj("tree",thex  ,they + thisLayerRange,treeHeight,"green"))
-                knownobjs.append(obj("tree",thex  ,they - thisLayerRange,treeHeight,"green"))
+                addKnownObject(obj("tree",thex + thisLayerRange ,they ,treeHeight,"green"))
+                addKnownObject(obj("tree",thex - thisLayerRange ,they ,treeHeight,"green"))
+                addKnownObject(obj("tree",thex  ,they + thisLayerRange,treeHeight,"green"))
+                addKnownObject(obj("tree",thex  ,they - thisLayerRange,treeHeight,"green"))
             
              
                 
     #make a few large walls that can be flown over
     for theheight in range(10):
         for wall in range(15):
-            knownobjs.append(obj("wall",wall,15,theheight+1,"white"))
-            knownobjs.append(obj("wall",wall + 5,19,theheight+1,"white"))
+            addKnownObject(obj("wall",wall,15,theheight+1,"white"))
+            addKnownObject(obj("wall",wall + 5,19,theheight+1,"white"))
 
 #make large walls that cant be flown over
     for theheight in range(defaultFlightHeight + 5):
         for wall in range(15):
-            knownobjs.append(obj("wall",wall,25,theheight+1,"white"))
-            knownobjs.append(obj("wall",wall + 10,21,theheight+1,"white"))   
-            knownobjs.append(obj("wall",wall + 10,28,theheight+1,"white"))
+            addKnownObject(obj("wall",wall,25,theheight+1,"white"))
+            addKnownObject(obj("wall",wall + 10,21,theheight+1,"white"))   
+            addKnownObject(obj("wall",wall + 10,28,theheight+1,"white"))
     for theheight in range(defaultFlightHeight + 5):
-            knownobjs.append(obj("wall",24,22,theheight+1,"white"))
-            knownobjs.append(obj("wall",24,23,theheight+1,"white"))
-            knownobjs.append(obj("wall",24,24,theheight+1,"white"))
-            knownobjs.append(obj("wall",24,25,theheight+1,"white"))
-            knownobjs.append(obj("wall",24,26,theheight+1,"white"))
-            knownobjs.append(obj("wall",24,27,theheight+1,"white"))
+            addKnownObject(obj("wall",24,22,theheight+1,"white"))
+            addKnownObject(obj("wall",24,23,theheight+1,"white"))
+            addKnownObject(obj("wall",24,24,theheight+1,"white"))
+            addKnownObject(obj("wall",24,25,theheight+1,"white"))
+            addKnownObject(obj("wall",24,26,theheight+1,"white"))
+            addKnownObject(obj("wall",24,27,theheight+1,"white"))
             
 def safeToMove(x,y,z):
     if (z> maxFlightHeight):
         return False
-    for objs in knownobjs:
+    for objs in knownObjs:
         if (objs.name!="drone"):
             if (objs.x==x and objs.y==y and objs.z==z):
                 print("Near collision with " + objs.getLabel())
@@ -190,20 +198,18 @@ def renderActions(self):
         value6 = ""
     
     retval = retval + "\n <BR>Drone actions: " + droneActions + "<BR><BR>"
-    retval = retval + "\n <a href='/?action=move&value=left'><</a> | <a href='/?action=move&value=right'>></a> | "
-    retval = retval + "\n <a href='/?action=move&value=up'> /\\ </a> | <a href='/?action=move&value=down'>\\/</a> | "
-    retval = retval + "\n <a href='/?action=move&value=higher'>H</a> | <a href='/?action=move&value=lower'>L</a> "
+    retval = retval + html.makeLink("/?action=move&value=left","<") + " | "  + html.makeLink("/?action=move&value=right",">") + " | "
+    retval = retval + html.makeLink("/?action=move&value=up","/\\") + " | " + html.makeLink("/?action=move&value=down","\\/") + " | "
+    retval = retval + html.makeLink("/?action=move&value=higher","Raise") + " | "  + html.makeLink("/?action=move&value=lower","Lower") + " | "
+    retval = retval + html.makeLink("/?action=randomworld'>","Randomize World") + " | "
     
-    retval = retval + "\n | <a href='/?action=randomworld'>Randomize World</a>   "
+ 
     
+    retval = retval + "\n<BR><BR> " + html.makeInput("action","ip",action)
+    retval = retval + html.makeInput("value","ip",value1)  + html.makeInput("value2","ip",value2)
+    retval = retval + html.makeInput("value3","ip",value3)  + html.makeInput("value4","ip",value4)
+    retval = retval + html.makeInput("value5","ip",value5)
     
-    retval = retval + "\n<BR><BR> Action: <input type='text' id='action' class='ip'  value='" + action + "'> \n"
-    retval = retval + "\n Value1: <input type='text' id='value' class='ip' value='" + value1 + "'> "
-    retval = retval + "\n Value2: <input type='text' id='value2' class='ip' value='" + value2 + "'> "
-    retval = retval + "\n Value3: <input type='text' id='value3' class='ip' value='" + value3 + "'> "
-    retval = retval + "\n Value4: <input type='text' id='value4' class='ip' value='" + value4 + "'> "
-    retval = retval + "\n Value5: <input type='text' id='value5' class='ip' value='" + value5 + "'> "
-    retval = retval + "\n Value6: <input type='text' id='value6' class='ip' value='" + value6 + "'> "
     retval = retval + "\n <input type='button' value='run' onclick='subForm();'>\n "
     return retval
 
@@ -236,7 +242,7 @@ def renderWorld(self):
     for checkz in range(world.z):
         z = world.z - checkz
         response_content = response_content + "\n<div class='.mcell' style='position: absolute; width: " + str(world.x * blocksize) + "px;  height: " + str(world.y * blocksize) + "px'>"
-        for objs in knownobjs:
+        for objs in knownObjs:
             if (objs.z==z):
                 response_content = response_content + objs.renderIt() 
         response_content = response_content + "\n</div> "
@@ -248,7 +254,7 @@ def seedWorld():
     global world
     global drone
     global base
-    global knownobjs
+    global knownObjs
     global action
     global droneActions
     global theWorld
@@ -262,17 +268,17 @@ def seedWorld():
                 worldPoint = obj("",x,y,world.z - z,"")
                 theWorld.append(worldPoint)
     
-    knownobjs = []
+    knownObjs = []
     for y in range(world.y):
         for x in range(world.x):
             worldPoint = obj("ground",x,y,1,"gray")
-            knownobjs.append(worldPoint) 
+            addKnownObject(worldPoint) 
     createObstacles()
 
     drone = obj("drone",11,11,8,"blue")        
     base = obj("base",2,3,2,"red")
-    knownobjs.append(drone)
-    knownobjs.append(base)
+    addKnownObject(drone)
+    addKnownObject(base)
     action=""
     droneActions="Randomizing world"
      
@@ -467,8 +473,8 @@ class webRequestHandler(BaseHTTPRequestHandler):
         drone.y=drone.y + currentMoveY
         drone.z=drone.z + currentMoveZ
         
-        knownobjs.pop(0)
-        knownobjs.insert(0,drone)
+        knownObjs.pop(0)
+        knownObjs.insert(0,drone)
 
         response_content = renderWorld(self) + renderScripts(self)
                  
