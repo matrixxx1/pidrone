@@ -15,8 +15,8 @@ perspectiveY="top"  #top or bottom
 
 
 blocksize = 14 #how many pixels wide and tall a block is in the world. a block represents a cubic meter
-padtop= 70 # where to start rendering the world on the up/down axis
-padleft=70 # where to start rendering the world on the left/right axis
+padtop= 10 # where to start rendering the world on the up/down axis
+padleft=50 # where to start rendering the world on the left/right axis
 
 #when rendering to imply height difference, how much shift should occur
 perspectiveTopPad = blocksize / 4 # up/down
@@ -89,7 +89,7 @@ class obj():
         top = padtop  + (self.x * blocksize)   + shiftTopPerspectiveByLayer(self.z) 
         left = padleft + (self.y  * blocksize)   + shiftLeftPerspectiveByLayer(self.z) 
          
-        retval = retval + "\n <div onclick='sD(" + str(self.x) + "," + str(self.y) +  "," + str(self.z + 1) + ")' title='Object: " + self.getLabel() + "' "
+        retval = retval + "\n <div   onclick='sD(" + str(self.x) + "," + str(self.y) +  "," + str(self.z + 1) + ")' title='Object: " + self.getLabel() + "' "
         retval = retval + " style='position: absolute; top: " + str(top) + ";   left: " + str(left) + ";  z-index: " + str(self.z) + ";  "
         retval = retval  + " width: " + str(int(blocksize) * self.width) + "px; height: " + str(int(blocksize) * self.height) + "px;'   class='mo " + self.name + "'></div>" 
 
@@ -196,9 +196,9 @@ def createObstacles():
                     addKnownObject(obj("tree",thex  ,they + thisLayerRange,treeHeight))
                     addKnownObject(obj("tree",thex  ,they - thisLayerRange,treeHeight))
             
-    # make some tall random walls
+    # make some random walls
     for wallCounter in range(1,random.randint(4, 10)):
-        rndHeight= random.randint(4, 10) 
+        rndHeight= random.randint(4, maxFlightHeight) 
         addKnownObject(obj("wall",random.randint(4, 30) ,random.randint(4, 30) ,rndHeight ,random.randint(1, 5) ,random.randint(1, 5) , rndHeight ))    
                 
    # #make a few large walls that can be flown over
@@ -209,13 +209,28 @@ def createObstacles():
     addKnownObject(obj("wall",7,5,5,15,1,4))
     addKnownObject(obj("wall",17,15,5,15,1,4))
     
+    addKnownObject(obj("poi",35,15,2))
+    addKnownObject(obj("poi",35,30,2))
+    addKnownObject(obj("poi",35,45,2))
+    addKnownObject(obj("poi",35,50,2))
+    addKnownObject(obj("poi",35,75,2))
+    
+    addKnownObject(obj("poi",5,15,2))
+    addKnownObject(obj("poi",5,30,2))
+    addKnownObject(obj("poi",5,45,2))
+    addKnownObject(obj("poi",5,50,2))
+    addKnownObject(obj("poi",5,75,2))
+            
 #make large walls that cant be flown over
     #for theheight in range(defaultFlightHeight + 5):
-    addKnownObject(obj("wall",15,25,defaultFlightHeight ,15,1,defaultFlightHeight ))     
-    addKnownObject(obj("wall",24,5,defaultFlightHeight ,1,25, defaultFlightHeight ))
-    addKnownObject(obj("wall",20,10,defaultFlightHeight ,1,25, defaultFlightHeight ))          
-    addKnownObject(obj("wall",15,15,defaultFlightHeight ,1,25, defaultFlightHeight ))    
+    addKnownObject(obj("wall",15,25,maxFlightHeight ,15,1,maxFlightHeight ))     
+    addKnownObject(obj("wall",24,5,maxFlightHeight ,1,25, maxFlightHeight ))
+    addKnownObject(obj("wall",20,10,maxFlightHeight ,1,25, maxFlightHeight ))          
+    addKnownObject(obj("wall",15,15,maxFlightHeight ,1,25, maxFlightHeight ))    
     
+    
+        
+        
 def renderActions(self):
     global longTermGoalAchieved
     global droneActions
@@ -292,6 +307,7 @@ def renderWorld(self):
     response_content = response_content + "  <BR>" + renderActions(self)
     response_content = response_content + "\n <BR><BR><BR><BR><BR>\n <style>"
     response_content = response_content + "\n .tree { background-color: green; opacity: .3; } "
+    response_content = response_content + "\n .poi { background-color: yellow; opacity: 1; } "
     response_content = response_content + "\n .treetrunk { background-color: brown; opacity: .3;  } "
     response_content = response_content + "\n .drone { background-color: blue; opacity: 1;  } "
     response_content = response_content + "\n .base { background-color: red; opacity: 1;  } "
@@ -313,7 +329,7 @@ def renderWorld(self):
     left = 0
     classes = ""
     response_content = response_content + "\n<div class='.worldlayer' style='position: absolute; width: " + str(world.x * blocksize) + "px;  height: " + str(world.y * blocksize) + "px'>"
-    for checkz in range(world.z):
+    for checkz in range(world.z +5):
         z = world.z - checkz
        # response_content = response_content + "\n<div class='.worldlayer' style='position: absolute; width: " + str(world.x * blocksize) + "px;  height: " + str(world.y * blocksize) + "px'>"
         for objs in knownObjs:

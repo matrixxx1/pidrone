@@ -12,12 +12,21 @@ def safeToMove(x,y,z,maxFlightHeight,knownObjs):
         return False
     
     for objs in knownObjs:
-        if (objs.name!="drone"):
+        if (objs.name!="drone" and objs.name!="ground"):
             if (x >= objs.x1() and x <= objs.x2()):
+                #print("x axis " + str(x) + "  is between " + str(objs.x1()) + " and " + str(objs.x2()))
                 if (y >= objs.y1() and y <= objs.y2()):
-                    if (z >= objs.z1() and z <= objs.z2()):
+                    #print("y axis " +  str(y) + "  is between " + str(objs.y1()) + " and " + str(objs.y2()))
+                    if (z <= objs.z1() and z >= objs.z2()):                        
+                        #print("z axis " +  str(z) + "  is between " + str(objs.z1()) + " and " + str(objs.z2()))
                         print("Near collision with " + objs.getLabel())
                         return False
+                    #else:
+                     #   print("z axis " +  str(z) + "  is NOT between " + str(objs.z1()) + " and " + str(objs.z2()))
+               # else:
+                        #print("y axis " +  str(y) + "  is NOT between " + str(objs.y1()) + " and " + str(objs.y2()))
+           # else:
+                        #print("x axis " +  str(x) + "  is NOT between " + str(objs.x1()) + " and " + str(objs.x2()))
     return True
 
 
