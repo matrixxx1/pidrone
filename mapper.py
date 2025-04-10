@@ -21,7 +21,9 @@ sys.setrecursionlimit(5000)
 branchCounter = 0
 
 autoPilotDistance=0
-autoPilotStepLimit=3 # this ensures that inneficient routes are not considered. If the steps are more than 3x the distance, drop the branch
+autoPilotStepLimit=1.5 # this ensures that inneficient routes are not considered.
+#If the steps are more than 2x the distance, drop the branch
+
 level2ApPathsList=[]
 
 #this determines how the world will be rendered to the browser
@@ -45,17 +47,17 @@ maxFlightHeight = 15 # max height the drone is allowed to achieve
 class obj():
     def __init__(self, name, x, y,z, objHeight=1, objWidth=1, objDepth=1):
         if not isinstance(x, int):
-            raise TypeError("x must be an integer")
+            raise TypeError("x must be an integer, instead its " + x)
         if not isinstance(y, int):
-            raise TypeError("y must be an integer")
+            raise TypeError("y must be an integer, instead its " + y)
         if not isinstance(z, int):
-            raise TypeError("z must be an integer")
+            raise TypeError("z must be an integer, instead its " + z)
         if not isinstance(objHeight, int):
-            raise TypeError("objHeight must be an integer")
+            raise TypeError("objHeight must be an integer, instead its " + objHeight)
         if not isinstance(objWidth, int):
-            raise TypeError("objWidth must be an integer")
+            raise TypeError("objWidth must be an integer, instead its " + objWidth)
         if not isinstance(objDepth, int):
-            raise TypeError("objDepth must be an integer")
+            raise TypeError("objDepth must be an integer, instead its " + objDepth)
         self.name=name
         self.x = x
         self.y = y
@@ -113,7 +115,12 @@ class obj():
         top = padtop  + (self.x * blocksize)   + shiftTopPerspectiveByLayer(self.z) 
         left = padleft + (self.y  * blocksize)   + shiftLeftPerspectiveByLayer(self.z) 
          
-        retval = retval + "\n <div   onclick='sD(" + str(self.x) + "," + str(self.y) +  "," + str(self.z + 1) + ")' title='Object: " + self.getLabel() + "' "
+        #ap level 1
+        #retval = retval + "\n <div   onclick='sD(" + str(self.x) + "," + str(self.y) +  "," + str(self.z + 1) + ")' "
+        #ap level 2
+        retval = retval + "\n <div   onclick='sD2(" + str(self.x) + "," + str(self.y) +  "," + str(self.z + 1) + ")' "
+        
+        retval = retval + "\n title='Object: " + self.getLabel() + "' "
         retval = retval + " style='position: absolute; top: " + str(top) + ";   left: " + str(left) + ";  z-index: " + str(self.z) + ";  "
         retval = retval  + " width: " + str(int(blocksize) * self.width) + "px; height: " + str(int(blocksize) * self.height) + "px;'   class='mo " + self.name + "'></div>" 
 
@@ -324,6 +331,9 @@ def renderScripts(self):
     retval = retval + "\n window.droneY=" + str(drone.y)
     retval = retval + "\n window.droneZ=" + str(drone.z)
     retval = retval + "\n function sD(x,y,z){  window.location.href='/?action=ap&value1=' + x + '&value2=' + y + '&value3=' + z  + '&value4=' + window.droneX  + '&value5=' + window.droneY  + '&value6=' + window.droneZ;}  \n"
+    retval = retval + "\n function sD2(x,y,z){  window.location.href='/?action=aplevel2&value1=' + x + '&value2=' + y + '&value3=' + z  + '&value4=' + window.droneX  + '&value5=' + window.droneY  + '&value6=' + window.droneZ;}  \n"
+    
+    
     retval = retval + "\n function getIt(frmName){ return document.getElementById(frmName).value; }  \n"
     retval = retval + "\n function subForm(){ window.location.href='/?action=' + getIt(\"action\") + '&value1=' + getIt(\"value1\") + '&value2=' + getIt(\"value2\") + '&value3=' + getIt(\"value3\") + '&value4=' + getIt(\"value4\") + '&value5=' + getIt(\"value5\") + '&value6=' + getIt(\"value6\"); } \n"
     retval = retval + "\n function autoPilot(){ if (getIt(\"action\")==\"ap\"){subForm();}} \n"
@@ -714,12 +724,20 @@ class webRequestHandler(BaseHTTPRequestHandler):
             addKnownObject(autoPilotDestination)
          
         if (action=="aplevel2"):
-            apDestination=obj("apdestination",10,3, 3)
+            threads.clear()
+            totalThreads=0
+            apDestination=obj("apdestination",int(value1),int(value2), int(value3))
             autoPilotDistance = collisiondetection.distanceBetweenObjects(drone,apDestination)
             print("AP Distance: " + str(autoPilotDistance))
             addPossiblePath(drone, obj("ap",drone.x, drone.y, drone.z), apDestination,[])
-            runPaths() # clean dead paths
-            runPaths()
+            
+            while (totalThreads > 0):
+                print("Total threads left: " + str(totalThreads))
+                time.sleep(1)
+            
+            for thread in threads:
+                thread.join()
+                
             print("Final Paths: " + str(len(level2ApPathsList)))
             apDone =False
             mostEfficient = 99999999
@@ -730,14 +748,7 @@ class webRequestHandler(BaseHTTPRequestHandler):
                     apDone=True
                     if (mostEfficient > len(killDeadPaths.recordedPath)):
                         mostEfficient=len(killDeadPaths.recordedPath)
-                        mostEfficientRoute = killDeadPaths.recordedPath
-            
-            while (totalThreads > 0):
-                print("Total threads left: " + str(totalThreads))
-                time.sleep(1)
-            
-            for thread in threads:
-                thread.join()                        
+                        mostEfficientRoute = killDeadPaths.recordedPath                  
                         
             if (apDone==False):
                 print("Didnt make it to destination")
@@ -745,10 +756,14 @@ class webRequestHandler(BaseHTTPRequestHandler):
                 print("Made it to destination in " + str(mostEfficient) + " moves")
                 print("Path to destination")
                 
-                for pathCounter in range(1, len(killDeadPaths.recordedPath)):
-                    print("Step: " + str(pathCounter) + ", " + str(killDeadPaths.recordedPath[pathCounter].x) + "," + str(killDeadPaths.recordedPath[pathCounter].y) + "," + str(killDeadPaths.recordedPath[pathCounter].z))
+                for pathCounter in range(1, len(mostEfficientRoute)):
+                    print("Step: " + str(pathCounter) + ", " + str(mostEfficientRoute[pathCounter].x) + "," + str(mostEfficientRoute[pathCounter].y) + "," + str(mostEfficientRoute[pathCounter].z))
 
-
+                drone.x=mostEfficientRoute[1].x
+                drone.y=mostEfficientRoute[1].y
+                drone.z=mostEfficientRoute[1].z
+                
+                
             print("All threads finished")    
         if (action=="perspectiveX"): 
             perspectiveX = value1
