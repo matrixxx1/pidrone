@@ -1,5 +1,9 @@
+import os
 import random
 import http
+import sys
+import copy
+
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import urllib.parse
@@ -8,6 +12,12 @@ import urllib.parse
 import helpers_html as html
 import helpers_collisiondetection as collisiondetection 
 
+sys.setrecursionlimit(5000)
+branchCounter = 0
+
+autoPilotDistance=0
+autoPilotStepLimit=10 # this ensures that inneficient routes are not considered. If the steps are more than 10x the distance, drop the branch
+level2ApPathsList=[]
 
 #this determines how the world will be rendered to the browser
 perspectiveX="right"    #left or right
@@ -25,13 +35,22 @@ perspectiveLeftPad = blocksize / 4  #left/right
       
 defaultFlightHeight = 10 # prefered height that the drone should fly
 maxFlightHeight = 15 # max height the drone is allowed to achieve
-
-
-
-
+ 
 
 class obj():
     def __init__(self, name, x, y,z, objHeight=1, objWidth=1, objDepth=1):
+        if not isinstance(x, int):
+            raise TypeError("x must be an integer")
+        if not isinstance(y, int):
+            raise TypeError("y must be an integer")
+        if not isinstance(z, int):
+            raise TypeError("z must be an integer")
+        if not isinstance(objHeight, int):
+            raise TypeError("objHeight must be an integer")
+        if not isinstance(objWidth, int):
+            raise TypeError("objWidth must be an integer")
+        if not isinstance(objDepth, int):
+            raise TypeError("objDepth must be an integer")
         self.name=name
         self.x = x
         self.y = y
@@ -60,7 +79,7 @@ class obj():
         return int(self.z) - int(self.depth)
     
     def getLabel(self):
-        return self.name + " coords: x: " + str(self.x) +", y: " + str(self.y) + ", z: " + str(self.z) + " size: x: " + str(self.width) +", y: " + str(self.height) + ", z: " + str(self.depth)  + ", id: " + str(self.id)
+        return self.name + " coords: [" + str(self.x) +"," + str(self.y) + "," + str(self.z) + "] size: [" + str(self.width) +"," + str(self.height) + "," + str(self.depth)  + "], id: " + str(self.id)
 
     def renderIt(self):
         global perspectiveX
@@ -97,7 +116,8 @@ class obj():
 
 
 
-         
+apPath = []
+#apPath.append(obj("appath",0, 0,0))        
 
 theWorld = [] #this array contains the world... literally. it is an array of arrays of arrays (x,y,z) 
 knownObjs= [] #this is an array of known objects. this contains the drone, the base, objects found, etc       
@@ -115,7 +135,7 @@ value5 = ""
 value6 = "" 
 world = ""
 drone=""
-autoPilotDestination = obj("apdestination",0,0,0,"")
+autoPilotDestination = None #this holds the destination (as an object) for autopilot when enabled
 base="" 
  
 
@@ -197,7 +217,7 @@ def createObstacles():
                     addKnownObject(obj("tree",thex  ,they - thisLayerRange,treeHeight))
             
     # make some random walls
-    for wallCounter in range(1,random.randint(4, 10)):
+    for wallCounter in range(1,random.randint(1,5)):
         rndHeight= random.randint(4, maxFlightHeight) 
         addKnownObject(obj("wall",random.randint(4, 30) ,random.randint(4, 30) ,rndHeight ,random.randint(1, 5) ,random.randint(1, 5) , rndHeight ))    
                 
@@ -209,24 +229,27 @@ def createObstacles():
     addKnownObject(obj("wall",7,5,5,15,1,4))
     addKnownObject(obj("wall",17,15,5,15,1,4))
     
-    addKnownObject(obj("poi",35,15,2))
-    addKnownObject(obj("poi",35,30,2))
-    addKnownObject(obj("poi",35,45,2))
-    addKnownObject(obj("poi",35,50,2))
-    addKnownObject(obj("poi",35,75,2))
+    addKnownObject(obj("poi",35,15,1))
+    addKnownObject(obj("poi",35,30,1))
+    addKnownObject(obj("poi",35,45,1))
+    addKnownObject(obj("poi",35,50,1))
+
     
-    addKnownObject(obj("poi",5,15,2))
-    addKnownObject(obj("poi",5,30,2))
-    addKnownObject(obj("poi",5,45,2))
-    addKnownObject(obj("poi",5,50,2))
-    addKnownObject(obj("poi",5,75,2))
+    addKnownObject(obj("poi",5,15,1))
+    addKnownObject(obj("poi",5,30,1))
+    addKnownObject(obj("poi",5,45,1))
+    addKnownObject(obj("poi",5,50,1))
+
+
+    addKnownObject(obj("poi",15,2,1))
             
+    addKnownObject(obj("poi",15,50,1))
 #make large walls that cant be flown over
     #for theheight in range(defaultFlightHeight + 5):
     addKnownObject(obj("wall",15,25,maxFlightHeight ,15,1,maxFlightHeight ))     
     addKnownObject(obj("wall",24,5,maxFlightHeight ,1,25, maxFlightHeight ))
     addKnownObject(obj("wall",20,10,maxFlightHeight ,1,25, maxFlightHeight ))          
-    addKnownObject(obj("wall",15,15,maxFlightHeight ,1,25, maxFlightHeight ))    
+
     
     
         
@@ -252,20 +275,11 @@ def renderActions(self):
     
     retval = ""
     if (longTermGoalAchieved==True):
-        action=""
-        value1 = ""
-        value2 = ""
-        value3 = ""
-        value4 = ""
-        value5 = ""
-        value6 = ""
-        autoPilotDestination=None
-        
-        removeKnownObjectByName("apdestination")
+        resetAP()
          
             
             
-    retval = retval + "\n <BR>Drone actions: " + droneActions + "<BR><BR>"
+    retval = retval + "\n <BR>Drone actions: " + droneActions.replace("<","<BR>") + "<BR><BR>"
     retval = retval + html.makeLink("/?action=move&value=left","<") + " | "  + html.makeLink("/?action=move&value=right",">") + " | "
     retval = retval + html.makeLink("/?action=move&value=up","/\\") + " | " + html.makeLink("/?action=move&value=down","\\/") + " | "
     retval = retval + html.makeLink("/?action=move&value=higher","Raise") + " | "  + html.makeLink("/?action=move&value=lower","Lower") + " | "
@@ -274,16 +288,30 @@ def renderActions(self):
     retval = retval + html.makeLink("/?action=perspectiveX&value1=right","perspective right") + " | "
     retval = retval + html.makeLink("/?action=perspectiveY&value1=top","perspective top") + " | "
     retval = retval + html.makeLink("/?action=perspectiveY&value1=bottom","perspective bottom") + " | "
- 
+    retval = retval + html.makeLink("/","Refresh") + " | "
     
-    retval = retval + "\n<BR><BR> " + html.makeInput("action","ip",action)
-    retval = retval + html.makeInput("value1","ip",value1)  + html.makeInput("value2","ip",value2)
-    retval = retval + html.makeInput("value3","ip",value3)  + html.makeInput("value4","ip",value4)
-    retval = retval + html.makeInput("value5","ip",value5) + html.makeInput("value6","ip",value6)
+    #retval = retval + "\n<BR><BR> " + html.makeInput("action","ip",action)
+    #retval = retval + html.makeInput("value1","ip",value1)  + html.makeInput("value2","ip",value2)
+    #retval = retval + html.makeInput("value3","ip",value3)  + html.makeInput("value4","ip",value4)
+    #retval = retval + html.makeInput("value5","ip",value5) + html.makeInput("value6","ip",value6)
+   
+    retval = retval + "\n<BR><BR> " + html.makeInput("action","ip")
+    retval = retval + html.makeInput("value1","ip")  + html.makeInput("value2","ip")
+    retval = retval + html.makeInput("value3","ip")  + html.makeInput("value4","ip")
+    retval = retval + html.makeInput("value5","ip") + html.makeInput("value6","ip")
     
     
     retval = retval + "\n <input type='button' value='run' onclick='subForm();'>\n "
     return retval
+
+def resetAP():
+    global longTermGoalAchieved
+    global droneActions
+    global autoPilotDestination
+    
+    longTermGoalAchieved=False     
+    autoPilotDestination=None        
+    removeKnownObjectByName("apdestination")
 
 def renderScripts(self):
     retval = "\n <script>  "
@@ -301,11 +329,19 @@ def renderWorld(self):
     #let timeoutId = setTimeout(greet, 2000, "World")
     response_content = "<BR>" + drone.getLabel() + "<BR> World Size - x: " + str(world.x) + ", y: " + str(world.y) + ", z: " + str(world.z)
     response_content = response_content + "  <BR> Known objects: " + str(len(knownObjs))
-    response_content = response_content + "  <BR> AP Destination: " + autoPilotDestination.getLabel()
+    
+    if (autoPilotDestination!=None):
+        response_content = response_content + "  <BR> AP Destination: " + autoPilotDestination.getLabel()
+    else:
+        response_content = response_content + "  <BR> AP Destination: None"
     response_content = response_content + "  <BR> Perspective: " + perspectiveX + ", " + perspectiveY
     
     response_content = response_content + "  <BR>" + renderActions(self)
-    response_content = response_content + "\n <BR><BR><BR><BR><BR>\n <style>"
+    response_content = response_content + "\n <BR><BR><BR><BR><BR>\n "
+    return response_content
+
+def renderStyles(self):
+    response_content =  "\n<style>"
     response_content = response_content + "\n .tree { background-color: green; opacity: .3; } "
     response_content = response_content + "\n .poi { background-color: yellow; opacity: 1; } "
     response_content = response_content + "\n .treetrunk { background-color: brown; opacity: .3;  } "
@@ -321,14 +357,14 @@ def renderWorld(self):
 
     response_content = response_content + "\n  border-" + perspectiveX + ": " + str(perspectiveTopPad) + "px solid black; border-" + perspectiveY + ": " + str(perspectiveTopPad) + "px solid black;  "
     response_content = response_content + "\n } "
-    response_content = response_content + "\n   .ip {   width: 60px;   } </style>"
+    response_content = response_content + "\n   .ip {   width: 60px;   } </style>\n"
+    return response_content
 
-    
-    
+def renderMap(self):    
     top=0
     left = 0
     classes = ""
-    response_content = response_content + "\n<div class='.worldlayer' style='position: absolute; width: " + str(world.x * blocksize) + "px;  height: " + str(world.y * blocksize) + "px'>"
+    response_content = "\n<div class='.worldlayer' style='position: absolute; width: " + str(world.x * blocksize) + "px;  height: " + str(world.y * blocksize) + "px'>"
     for checkz in range(world.z +5):
         z = world.z - checkz
        # response_content = response_content + "\n<div class='.worldlayer' style='position: absolute; width: " + str(world.x * blocksize) + "px;  height: " + str(world.y * blocksize) + "px'>"
@@ -350,7 +386,7 @@ def seedWorld():
     global droneActions
     global theWorld
     
-    world = obj("world",35,80,15,"")
+    world = obj("world",35,80,15)
     aPath=[]
     theWorld=[]
     #for y in range(world.y):
@@ -379,10 +415,10 @@ def seedWorld():
      
 seedWorld()
 
-
-
-class webRequestHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
+def handleDroneMovement():
+    
+       
+        
         global longTermGoalAchieved
         global droneActions
         global world
@@ -398,33 +434,19 @@ class webRequestHandler(BaseHTTPRequestHandler):
         global autoPilotDestination
         global perspectiveX
         global perspectiveY
-        
-        longTermGoalAchieved=False
-        
-        self.send_response(200)
-        self.send_header('Content-type', 'text/html')
-        self.end_headers()
-         
-        parsed_path = urllib.parse.urlparse(self.path)
-        query_string = parsed_path.query
-        loadQS() 
-       
+             
         currentMoveX = 0
         currentMoveY = 0
         currentMoveZ = 0
-         
-         
-        # make a new random world
-        if (action=="randomworld"):
-            seedWorld()
-            
-        
-        if (action=="ap"):
-            autoPilotDestination = obj("apdestination",value4, value5, value6)
-            addKnownObject(autoPilotDestination)
-            
+             
         # auto pilot code
-        if (action=="ap"):
+        if (autoPilotDestination == None):
+             print("No AP destination set")
+        else:
+             print("AP destination set, navigating to it")
+            
+
+            
              movementPerformed=False
              droneActions= ""
              xBlocked=False
@@ -434,8 +456,8 @@ class webRequestHandler(BaseHTTPRequestHandler):
 
              
              
-             if (int(value1) < drone.x):
-                if (collisiondetection.safeToMove(drone.x - 1,drone.y,drone.z ,maxFlightHeight,knownObjs)==True):
+             if (autoPilotDestination.x < drone.x):
+                if (collisiondetection.getObjectByCoordinate(drone.x - 1,drone.y,drone.z ,knownObjs)==None):
                     currentMoveX = currentMoveX  - 1
                     movementPerformed=True
                     droneActions= droneActions + ", Moving to destination on x- axis"
@@ -445,100 +467,107 @@ class webRequestHandler(BaseHTTPRequestHandler):
                     droneActions= droneActions + ", Avoiding collision on x- axis"
                     xBlocked=True
                     
-             if (int(value1) > drone.x):
-                if (collisiondetection.safeToMove(drone.x + 1,drone.y,drone.z ,maxFlightHeight,knownObjs)==True):
+             if (autoPilotDestination.x > drone.x):
+                checkPath = collisiondetection.getObjectByCoordinate(drone.x + 1,drone.y,drone.z ,knownObjs)
+                if (checkPath==None):
                     currentMoveX = currentMoveX + 1
                     movementPerformed=True
                     droneActions= droneActions + ", Moving to destination on x+ axis"
                     xBlocked=False
                 else:
                     movementPerformed=False  
-                    droneActions= droneActions + ", Avoiding collision on x+ axis"
+                    droneActions= droneActions + ", Avoiding collision on x+ axis with " + checkPath.getLabel()
                     xBlocked=True
                 
-             if (int(value2) > drone.y):
-                if (collisiondetection.safeToMove(drone.x ,drone.y + 1,drone.z,maxFlightHeight,knownObjs )==True):
+             if (int(autoPilotDestination.y) > drone.y):
+                checkPath=collisiondetection.getObjectByCoordinate(drone.x ,drone.y + 1,drone.z,knownObjs )
+                if (checkPath==None):
                     currentMoveY = currentMoveY + 1
                     movementPerformed=True
                     droneActions= droneActions + ", Moving to destination on y+ axis"
                     yBlocked=False
                 else:
                     movementPerformed=False  
-                    droneActions= droneActions + ", Avoiding collision on y+ axis"
+                    droneActions= droneActions + ", Avoiding collision on y+ axis with " + checkPath.getLabel()
                     yBlocked=True
                     
-             if (int(value2) < drone.y):
-                if (collisiondetection.safeToMove(drone.x ,drone.y - 1,drone.z ,maxFlightHeight,knownObjs)==True):
+             if (int(autoPilotDestination.y) < drone.y):
+                checkPath=collisiondetection.getObjectByCoordinate(drone.x ,drone.y - 1,drone.z ,knownObjs)
+                if (checkPath==None):
                     currentMoveY = currentMoveY - 1
                     movementPerformed=True
                     droneActions= droneActions + ", Moving to destination on y- axis"
                     yBlocked=False
                 else:
                     movementPerformed=False  
-                    droneActions= droneActions + ", Avoiding collision on y- axis"
+                    droneActions= droneActions + ", Avoiding collision on y- axis with " + checkPath.getLabel()
                     yBlocked=True
              
              # if drone is near destination
-             if (collisiondetection.isNearXY(drone,obj("dest",int(value1),int(value2),int(value3),""))==True):
-                 
-                 if (int(value3) < drone.z):
-                    if (collisiondetection.safeToMove(drone.x,drone.y,drone.z - 1,maxFlightHeight,knownObjs)==True):
+             if (collisiondetection.isNearXY(drone,autoPilotDestination)==True):
+                 print("Drone near destination")
+                 if (int(autoPilotDestination.z) < drone.z):
+                    checkPath=collisiondetection.getObjectByCoordinate(drone.x,drone.y,drone.z - 1,knownObjs)
+                    if (checkPath==None):
                         droneActions= droneActions + ", Lowering drone to z- destination"
                         movementPerformed=True
                         currentMoveZ = currentMoveZ - 1
                         zBlocked=False
                     else:
                         movementPerformed=False  
-                        droneActions= droneActions + ", Avoiding collision on z- axis"
+                        droneActions= droneActions + ", Avoiding collision on z- axis with " + checkPath.getLabel()
                         zBlocked=True
                         
-                 if (int(value3) > drone.z):
-                    if (collisiondetection.safeToMove(drone.x,drone.y,drone.z + 1,maxFlightHeight,knownObjs)==True):
+                 if (int(autoPilotDestination.z) > drone.z):
+                    checkPath=collisiondetection.getObjectByCoordinate(drone.x,drone.y,drone.z + 1,knownObjs)
+                    if (checkPath==None):
                         droneActions= droneActions + ", Raising drone to z+ destination"
                         movementPerformed=True
                         currentMoveZ = currentMoveZ + 1
                     else:
                         movementPerformed=False  
-                        droneActions= droneActions + ", Avoiding +collision on z+ axis"
+                        droneActions= droneActions + ", Avoiding +collision on z+ axis with " + checkPath.getLabel()
                         zBlocked=True
              else:
+                print("Drone NOT near destination")
                 if (drone.z < defaultFlightHeight):
-                    if (collisiondetection.safeToMove(drone.x,drone.y,drone.z + 1,maxFlightHeight,knownObjs)==True):
+                    checkPath=collisiondetection.getObjectByCoordinate(drone.x,drone.y,drone.z + 1,knownObjs)
+                    if (checkPath==None):
                         currentMoveZ = currentMoveZ + 1
                         movementPerformed=True
                         droneActions= droneActions + ", Gaining elevation z+ to safe flight height"
                         zBlocked=False
                     else:
                         movementPerformed=False  
-                        droneActions= droneActions + ", Avoiding collision on z+ axis"
+                        droneActions= droneActions + ", Avoiding collision on z+ axis with " + checkPath.getLabel()
                         zBlocked=True
                         
              if (movementPerformed==False):
                  if (xBlocked==True or yBlocked==True):
                      if (zBlocked==False):                         
-                        if (collisiondetection.safeToMove(drone.x,drone.y,drone.z + 1,maxFlightHeight,knownObjs)==True):
+                        if (collisiondetection.getObjectByCoordinate(drone.x,drone.y,drone.z + 1,knownObjs)==None):
                             droneActions= droneActions + ", Raising drone z+ to avoid obstacle"
                             movementPerformed=True
                             currentMoveZ =  1
                         else:
                             droneActions= droneActions + ", Drone unable to fly over obstacle"
-                            if (collisiondetection.safeToMove(drone.x + 1,drone.y,drone.z,maxFlightHeight,knownObjs )==True):
+                            if (collisiondetection.getObjectByCoordinate(drone.x + 1,drone.y,drone.z,knownObjs )==None):
                                 droneActions= droneActions + ", x+ axis attempt to avoid collision at max height"
                                 movementPerformed=True
                                 currentMoveX = 1
                             else:
-                                if (collisiondetection.safeToMove(drone.x - 1,drone.y,drone.z ,maxFlightHeight,knownObjs)==True):
+                                if (collisiondetection.getObjectByCoordinate(drone.x - 1,drone.y,drone.z ,knownObjs)==None):
                                     droneActions= droneActions + ", x- axis attempt to avoid collision at max height"
                                     movementPerformed=True
                                     currentMoveX = -1
                                 else:
                                     droneActions= droneActions + ", Unable to use x axis to avoid obstacle"
-                                    if (collisiondetection.safeToMove(drone.x,drone.y + 1,drone.z,maxFlightHeight,knownObjs)==True):
+                                    if (collisiondetection.getObjectByCoordinate(drone.x,drone.y + 1,drone.z,knownObjs)==None):
                                         droneActions= droneActions + ", y+ axis attempt to avoid collision at max height"
                                         movementPerformed=True
                                         currentMoveY =  1
                                     else:
-                                        if (collisiondetection.safeToMove(drone.x,drone.y-1,drone.z,maxFlightHeight,knownObjs)==True):
+                                        if (collisiondetection.getObjectByCoordinate(drone.x,drone.y-1,drone.z,knownObjs)==None):
                                             droneActions= droneActions + ", y- axis attempt to avoid collision at max height"
                                             movementPerformed=True
                                             currentMoveY =  -1
@@ -551,17 +580,12 @@ class webRequestHandler(BaseHTTPRequestHandler):
                              
                      
                 
-             if (int(value1) == drone.x and int(value2) == drone.y and int(value3) == drone.z and movementPerformed==False):
+             if (autoPilotDestination.x == drone.x and autoPilotDestination.y == drone.y and autoPilotDestination.z == drone.z and movementPerformed==False):
                 droneActions="Drone has landed, autopilot complete"
                 movementPerformed=True
-                longTermGoalAchieved=True                
-        
-        if (action=="perspectiveX"): 
-            perspectiveX = value1
-        if (action=="perspectiveY"): 
-            perspectiveY = value1
-            
-        #handle manuel moves. Note this does NOT ensure safety of the destination
+                longTermGoalAchieved=True        
+
+                    #handle manuel moves. Note this does NOT ensure safety of the destination
         if (action=="move"):
             if (value1=="higher"):
                 currentMoveZ = currentMoveZ + 1
@@ -577,54 +601,293 @@ class webRequestHandler(BaseHTTPRequestHandler):
                currentMoveX = currentMoveX - 1
         
         
-        
-        thisDestination = obj("appath",drone.x + currentMoveX, drone.y + currentMoveY,drone.z + currentMoveZ,"")
-        novelPath=True
-        
-        for pathPoint in apPath:
-            if (pathPoint.x==(drone.x + currentMoveX) and pathPoint.y==(drone.y + currentMoveY) and pathPoint.z==(drone.z + currentMoveZ)):
-                novelPath=False
-        
-        if (novelPath ==False and longTermGoalAchieved==False):
-            #caught in loop
-            droneActions=droneActions + ", Drone has gotten stuck, autopilot failed."
-            if (currentMoveX > 0):
-                droneActions=droneActions + ", Drone has gotten stuck x+, autopilot failed."
-                #moving right, set short term goal
-            if (currentMoveX < 0):
-                droneActions=droneActions + ", Drone has gotten stuck x-, autopilot failed."
-                #moving left, set short term goal
-            if (currentMoveY > 0):
-                droneActions=droneActions + ", Drone has gotten stuck y+, autopilot failed."
-                #moving down, set short term goal
-            if (currentMoveY < 0):
-                droneActions=droneActions + ", Drone has gotten stuck y-, autopilot failed."
-                #moving up, set short term goal
-        
-            
-        else:
-            if (longTermGoalAchieved==False):
-                apPath.append(thisDestination)
-                droneActions=droneActions + ", Drone found novel path."
-                drone.x=drone.x + currentMoveX
-                drone.y=drone.y + currentMoveY
-                drone.z=drone.z + currentMoveZ
-        
-        print("APPATH")
-        print(len(apPath))
-        
-        removeKnownObjectByName("Drone")
-        
-        #knownObjs.pop(0)
-        #knownObjs.insert(0,drone)
+        if (1==2):
+            thisDestination = obj("appath",drone.x + currentMoveX, drone.y + currentMoveY,drone.z + currentMoveZ)
+            novelPath=True
+                
+            for pathPoint in apPath:
+                if (pathPoint.x==(drone.x + currentMoveX) and pathPoint.y==(drone.y + currentMoveY) and pathPoint.z==(drone.z + currentMoveZ)):
+                    novelPath=False
+                
+            if (novelPath ==False and longTermGoalAchieved==False):
+                #caught in loop
+                #droneActions=droneActions + ", Drone has gotten stuck, autopilot failed."
+                if (currentMoveX > 0):
+                    droneActions=droneActions + ", Drone has gotten stuck x+, autopilot failed."
+                    #moving right, set short term goal
+                if (currentMoveX < 0):
+                    droneActions=droneActions + ", Drone has gotten stuck x-, autopilot failed."
+                    #moving left, set short term goal
+                if (currentMoveY > 0):
+                    droneActions=droneActions + ", Drone has gotten stuck y+, autopilot failed."
+                    #moving down, set short term goal
+                if (currentMoveY < 0):
+                    droneActions=droneActions + ", Drone has gotten stuck y-, autopilot failed."
+                    #moving up, set short term goal
+                
+                    
+            else:
+                if (longTermGoalAchieved==False):
+                    apPath.append(thisDestination)
+                    droneActions=droneActions + ", Drone found novel path."
+                    drone.x=drone.x + currentMoveX
+                    drone.y=drone.y + currentMoveY
+                    drone.z=drone.z + currentMoveZ
+                
+            #print("APPATH")
+           # print(len(apPath))
+                
+            removeKnownObjectByName("Drone")
 
-        response_content = renderScripts(self) + renderWorld(self) 
+class webRequestHandler(BaseHTTPRequestHandler):
+    
+    def scriptName(self,url):
+        return (url + "?").split("?")[0]
+    
+    def do_GET(self):
+        #if a file was requested, send that. Otherwise send the UI for the drone.
+        thefile = self.scriptName(self.path)
+        if (thefile != "/"):
+            try:
+                file_path = os.path.join(os.getcwd(), self.path[1:])
+                with open(file_path, 'rb') as file:
+                    self.send_response(200)
+                    self.send_header('Content-type', "image/jpeg")
+                    self.end_headers()
+                    self.wfile.write(file.read())
+                    return
+            except FileNotFoundError:
+                 self.send_response(404)
+                 self.send_header('Content-type', 'text/plain')
+                 self.end_headers()
+                 self.wfile.write("File [" + self.path + "] not found")
+                 return
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'text/plain')
+                self.end_headers()
+                self.wfile.write(str(e).encode())
+                return
+        
+        #request wasnt for a file, send drone UI
+        
+        global longTermGoalAchieved
+        global droneActions
+        global world
+        global query_string
+        global action
+        global value1
+        global value2
+        global value3
+        global value4
+        global value5
+        global value6
+        global apPath
+        global autoPilotDestination
+        global autoPilotDistance
+        global perspectiveX
+        global perspectiveY
+        
+        longTermGoalAchieved=False
+        
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+         
+        parsed_path = urllib.parse.urlparse(self.path)
+        query_string = parsed_path.query
+        loadQS() 
+        
+        # make a new random world
+        if (action=="randomworld"):
+            seedWorld()
+                    
+        if (action=="ap"):
+            resetAP()
+            autoPilotDestination = obj("apdestination",int(value1), int(value2), int(value3))
+            addKnownObject(autoPilotDestination)
+         
+        if (action=="aplevel2"):
+            apDestination=obj("apdestination",10,3, 3)
+            autoPilotDistance = collisiondetection.distanceBetweenObjects(drone,apDestination)
+            print("AP Distance: " + str(autoPilotDistance))
+            addPossiblePath(drone, obj("ap",drone.x, drone.y, drone.z), apDestination,[])
+            runPaths() # clean dead paths
+            runPaths()
+            print("Final Paths: " + str(len(level2ApPathsList)))
+            apDone =False
+            mostEfficient = 99999999
+            mostEfficientRoute = []
+            for killDeadPaths in level2ApPathsList:
+                if (killDeadPaths.branchGetsToDestination==True):
+                    print("BranchID: " + str(killDeadPaths.branchId) + " - Got to destination on x,y - Distance:" + str(len(killDeadPaths.recordedPath)))
+                    apDone=True
+                    if (mostEfficient > len(killDeadPaths.recordedPath)):
+                        mostEfficient=len(killDeadPaths.recordedPath)
+                        mostEfficientRoute = killDeadPaths.recordedPath
+                        
+                        
+            if (apDone==False):
+                print("Didnt make it to destination")
+            else:
+                print("Made it to destination in " + str(mostEfficient) + " moves")
+                print("Path to destination")
+                
+                for pathCounter in range(1, len(killDeadPaths.recordedPath)):
+                    print("Step: " + str(pathCounter) + ", " + str(killDeadPaths.recordedPath[pathCounter].x) + "," + str(killDeadPaths.recordedPath[pathCounter].y) + "," + str(killDeadPaths.recordedPath[pathCounter].z))
+                
+        if (action=="perspectiveX"): 
+            perspectiveX = value1
+        
+        if (action=="perspectiveY"): 
+            perspectiveY = value1
+        
+        if (action != "getmap"):
+            handleDroneMovement()
+            response_content = renderScripts(self) + renderStyles(self) + renderWorld(self)  + renderMap(self) 
+        else:
+            response_content = renderScripts(self) + renderStyles(self) + renderMap(self) 
                  
         #response_content = "<html><body><h1>Hello, World!</h1></body></html>"
         self.wfile.write(response_content.encode())
 
-apPath = []
-apPath.append(obj("appath",0, 0,0,""))
+def addPossiblePath(fromObj,currentObj,toObj,currentPath):
+    print ("addPossiblePath, current coords: " + str(currentObj.x) +"," + str(currentObj.y)  +"," + str(currentObj.z) )
+    #dist = collisiondetection.distanceBetweenObjects(fromObj,toObj)
+    global autoPilotDistance
+    global autoPilotStepLimit
+    
+    #print("autoPilotDistance: " + str(autoPilotDistance))
+    #print("autoPilotStepLimit: " + str(autoPilotStepLimit))
+    
+    if len(currentPath) < (autoPilotStepLimit * autoPilotDistance):
+        
+        
+        
+        newL2Path=possibleAPPath(copy.deepcopy(fromObj),copy.deepcopy(currentObj),copy.deepcopy(toObj),currentPath.copy())
+        
+        if (newL2Path.branchGetsToDestination==True):
+            print("Found path!")
+        else:
+            newL2Path.runPath()
+        
+        level2ApPathsList.append(newL2Path)
+        #runPaths()
+
+def runPaths():
+    global autoPilotDistance
+    changesMade=False
+    doLoop=True
+      
+    while doLoop==True:
+        changesMade=False
+        #print("in loop, Paths: " + str(len(level2ApPathsList)))
+        pathNum=1
+        for killDeadPaths in level2ApPathsList:
+            pathNum = pathNum + 1
+            print("in loop, BranchId #: " + str(killDeadPaths.branchId) + ", coords: " + str(killDeadPaths.currentLocation.x) + "," + str(killDeadPaths.currentLocation.y) + "," + str(killDeadPaths.currentLocation.z) + ", Distance: " + str(autoPilotDistance) + ", Steps: " + str(len(killDeadPaths.recordedPath)))
+            #if (killDeadPaths.branchDead==True):
+            if (killDeadPaths.branchGetsToDestination==False):
+                #print("removing branch id " + str(killDeadPaths.branchId))
+                level2ApPathsList.remove(killDeadPaths)
+                changesMade=True
+             
+            #else:
+                #print("running branch")
+                #killDeadPaths.runPath()
+                #changesMade=True
+                
+        if len(level2ApPathsList) < 1:
+            doLoop=False
+            
+        if (changesMade==False):
+            doLoop=False
+
+class possibleAPPath():
+    def __init__(self, fromLocation, currentLocation, toLocation,copyThisPath):
+        print ("new possibleAPPath , current coords: " + str(currentLocation.x) +"," + str(currentLocation.y)  +"," + str(currentLocation.z) )
+        global branchCounter
+        global autoPilotDestination
+        
+        branchCounter = branchCounter + 1
+        self.branchId=branchCounter
+        
+        self.fromLocation=fromLocation
+        self.currentLocation = obj(currentLocation.name,currentLocation.x, currentLocation.y, currentLocation.z)  
+        self.toLocation=toLocation 
+        
+        self.recordedPath=copyThisPath
+      
+        self.branchDead=False         
+        self.branchGetsToDestination=False        
+         
+        print ("spawning branch " + str(self.branchId) + "," + self.currentLocation.getLabel() + ", distance: " + str(autoPilotDestination) + ", steps: " + str(len(self.recordedPath)))
+        #self.runPath()
+        
+        if (self.currentLocation.x== self.toLocation.x and self.currentLocation.y== self.toLocation.y and self.currentLocation.z== self.toLocation.z  ):
+            print("made it to dest")
+            self.branchGetsToDestination=True
+            self.branchDead=True 
+            return
+        
+        
+        
+        
+    def runPath(self):
+        
+        #print("running path")
+       
+        #else:
+        #    self.branchDead=True
+            
+        self.checkLocation(self.currentLocation.x+1,self.currentLocation.y,self.currentLocation.z)
+        self.checkLocation(self.currentLocation.x-1,self.currentLocation.y,self.currentLocation.z)
+        self.checkLocation(self.currentLocation.x,self.currentLocation.y+1,self.currentLocation.z)
+        self.checkLocation(self.currentLocation.x,self.currentLocation.y-1,self.currentLocation.z)
+        self.checkLocation(self.currentLocation.x,self.currentLocation.y,self.currentLocation.z+1)
+        self.checkLocation(self.currentLocation.x,self.currentLocation.y,self.currentLocation.z-1)
+        self.branchDead=True
+        
+    def checkLocation(self,x,y,z):
+        global knownObjs
+        if (x < 1 or y < 1  or z < 1 ):
+            print("branch out of bounds-1")
+            #self.branchDead=True
+            return 0
+
+        if ( x > world.x ):
+            print("branch out of boundsx-2")
+            #self.branchDead=True
+            return 0
+        if ( y > world.y ):
+            print("branch out of boundsy-2")
+            #self.branchDead=True
+            return 0
+        if ( z > world.z):
+            print("branch out of boundsz-2  z: " + str(z) + ", world.z:" + str(world.z))
+            #self.branchDead=True
+            return 0
+
+
+
+        for eachLocation in self.recordedPath:
+            if (eachLocation.x== x and eachLocation.y== y and eachLocation.z== z):
+                print("already moved here, killing branch")
+                alreadyMovedHere=True
+                self.branchDead=True
+                return 0
+
+        self.currentLocation.x=x
+        self.currentLocation.y=y
+        self.currentLocation.z=z
+        self.recordedPath.append(self.currentLocation)
+        
+        checkLoc=collisiondetection.getObjectByCoordinate(x,y,z,knownObjs)
+        if (checkLoc==None):  
+            print("New path - spawning branch coords: " + str(self.currentLocation.x) + "," + str(self.currentLocation.y) + "," + str(self.currentLocation.z))
+            addPossiblePath(self.fromLocation, self.currentLocation, self.toLocation, self.recordedPath)
+            return 1
+
 
 def removeKnownObjectByName(objName):
     global knownObjs
