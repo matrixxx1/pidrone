@@ -3,6 +3,8 @@ import random
 import http
 import sys
 import copy
+import threading
+import time 
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -12,11 +14,14 @@ import urllib.parse
 import helpers_html as html
 import helpers_collisiondetection as collisiondetection 
 
+threads = []
+totalThreads = 0
+
 sys.setrecursionlimit(5000)
 branchCounter = 0
 
 autoPilotDistance=0
-autoPilotStepLimit=10 # this ensures that inneficient routes are not considered. If the steps are more than 10x the distance, drop the branch
+autoPilotStepLimit=3 # this ensures that inneficient routes are not considered. If the steps are more than 3x the distance, drop the branch
 level2ApPathsList=[]
 
 #this determines how the world will be rendered to the browser
@@ -687,6 +692,7 @@ class webRequestHandler(BaseHTTPRequestHandler):
         global autoPilotDistance
         global perspectiveX
         global perspectiveY
+        global totalThreads
         
         longTermGoalAchieved=False
         
@@ -725,7 +731,13 @@ class webRequestHandler(BaseHTTPRequestHandler):
                     if (mostEfficient > len(killDeadPaths.recordedPath)):
                         mostEfficient=len(killDeadPaths.recordedPath)
                         mostEfficientRoute = killDeadPaths.recordedPath
-                        
+            
+            while (totalThreads > 0):
+                print("Total threads left: " + str(totalThreads))
+                time.sleep(1)
+            
+            for thread in threads:
+                thread.join()                        
                         
             if (apDone==False):
                 print("Didnt make it to destination")
@@ -735,7 +747,9 @@ class webRequestHandler(BaseHTTPRequestHandler):
                 
                 for pathCounter in range(1, len(killDeadPaths.recordedPath)):
                     print("Step: " + str(pathCounter) + ", " + str(killDeadPaths.recordedPath[pathCounter].x) + "," + str(killDeadPaths.recordedPath[pathCounter].y) + "," + str(killDeadPaths.recordedPath[pathCounter].z))
-                
+
+
+            print("All threads finished")    
         if (action=="perspectiveX"): 
             perspectiveX = value1
         
@@ -752,28 +766,33 @@ class webRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(response_content.encode())
 
 def addPossiblePath(fromObj,currentObj,toObj,currentPath):
-    print ("addPossiblePath, current coords: " + str(currentObj.x) +"," + str(currentObj.y)  +"," + str(currentObj.z) )
-    #dist = collisiondetection.distanceBetweenObjects(fromObj,toObj)
+    global threads
+    #print("launching thread " + str(totalThreads))
+    t1 = threading.Thread(target = launchThread, args=(fromObj, currentObj,toObj,currentPath))  #create the thread t1
+    threads.append(t1)
+    t1.start()
+    return 0
+
     global autoPilotDistance
     global autoPilotStepLimit
-    
-    #print("autoPilotDistance: " + str(autoPilotDistance))
-    #print("autoPilotStepLimit: " + str(autoPilotStepLimit))
-    
-    if len(currentPath) < (autoPilotStepLimit * autoPilotDistance):
-        
-        
-        
-        newL2Path=possibleAPPath(copy.deepcopy(fromObj),copy.deepcopy(currentObj),copy.deepcopy(toObj),currentPath.copy())
-        
-        if (newL2Path.branchGetsToDestination==True):
-            print("Found path!")
-        else:
-            newL2Path.runPath()
-        
-        level2ApPathsList.append(newL2Path)
-        #runPaths()
 
+    if len(currentPath) < (autoPilotStepLimit * autoPilotDistance):
+        newL2Path=possibleAPPath(copy.deepcopy(fromObj),copy.deepcopy(currentObj),copy.deepcopy(toObj),currentPath.copy())
+        level2ApPathsList.append(newL2Path)
+
+def launchThread(fromObj,currentObj,toObj,currentPath):
+    global autoPilotDistance
+    global autoPilotStepLimit
+    global level2ApPathsList
+    global totalThreads
+    
+    totalThreads = totalThreads + 1
+    if len(currentPath) < (autoPilotStepLimit * autoPilotDistance):
+        newL2Path=possibleAPPath(copy.deepcopy(fromObj),copy.deepcopy(currentObj),copy.deepcopy(toObj),currentPath.copy())
+        level2ApPathsList.append(newL2Path)
+        
+    totalThreads = totalThreads - 1
+    
 def runPaths():
     global autoPilotDistance
     changesMade=False
@@ -805,7 +824,7 @@ def runPaths():
 
 class possibleAPPath():
     def __init__(self, fromLocation, currentLocation, toLocation,copyThisPath):
-        print ("new possibleAPPath , current coords: " + str(currentLocation.x) +"," + str(currentLocation.y)  +"," + str(currentLocation.z) )
+        #print ("new possibleAPPath , current coords: " + str(currentLocation.x) +"," + str(currentLocation.y)  +"," + str(currentLocation.z) )
         global branchCounter
         global autoPilotDestination
         
@@ -821,11 +840,11 @@ class possibleAPPath():
         self.branchDead=False         
         self.branchGetsToDestination=False        
          
-        print ("spawning branch " + str(self.branchId) + "," + self.currentLocation.getLabel() + ", distance: " + str(autoPilotDestination) + ", steps: " + str(len(self.recordedPath)))
+        #print ("spawning branch " + str(self.branchId) + "," + self.currentLocation.getLabel() + ", distance: " + str(autoPilotDestination) + ", steps: " + str(len(self.recordedPath)))
         #self.runPath()
         
         if (self.currentLocation.x== self.toLocation.x and self.currentLocation.y== self.toLocation.y and self.currentLocation.z== self.toLocation.z  ):
-            print("made it to dest")
+            #print("made it to dest")
             self.branchGetsToDestination=True
             self.branchDead=True 
             return
@@ -833,7 +852,7 @@ class possibleAPPath():
         
         
         
-    def runPath(self):
+    #def runPath(self):
         
         #print("running path")
        
@@ -872,7 +891,7 @@ class possibleAPPath():
 
         for eachLocation in self.recordedPath:
             if (eachLocation.x== x and eachLocation.y== y and eachLocation.z== z):
-                print("already moved here, killing branch")
+                #print("already moved here, killing branch")
                 alreadyMovedHere=True
                 self.branchDead=True
                 return 0
@@ -884,7 +903,7 @@ class possibleAPPath():
         
         checkLoc=collisiondetection.getObjectByCoordinate(x,y,z,knownObjs)
         if (checkLoc==None):  
-            print("New path - spawning branch coords: " + str(self.currentLocation.x) + "," + str(self.currentLocation.y) + "," + str(self.currentLocation.z))
+            #print("New path - spawning branch coords: " + str(self.currentLocation.x) + "," + str(self.currentLocation.y) + "," + str(self.currentLocation.z))
             addPossiblePath(self.fromLocation, self.currentLocation, self.toLocation, self.recordedPath)
             return 1
 
