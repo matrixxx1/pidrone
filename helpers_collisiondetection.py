@@ -7,22 +7,34 @@ def isNearXY(obj1,obj2):
     return False
 
 def distanceBetweenObjects(obj1,obj2):
-        distanceToDest=0
     
-        if (obj1.x < obj2.x):
+        print("distanceBetweenObjects-obj1 " + obj1.getLabel())
+        print("distanceBetweenObjects-obj2 " + obj2.getLabel())
+    
+        distanceToDest=0
+        
+        if not isinstance(obj1.x, int):
+            raise TypeError("obj1.x must be an object, instead its " + x)
+
+        if not isinstance(obj2.x, int):
+            raise TypeError("obj2.x must be an object, instead its " + x)
+
+        if (obj2.x > obj1.x):
             distanceToDest=distanceToDest + obj2.x - obj1.x
         else:
             distanceToDest=distanceToDest + obj1.x - obj2.x
             
-        if (obj1.y < obj2.y):
+        if (obj2.y > obj1.y):
             distanceToDest=distanceToDest + obj2.y - obj1.y
         else:
             distanceToDest=distanceToDest + obj1.y - obj2.y
             
-        if (obj1.z > obj2.z):
+        if (obj2.z > obj1.z):
             distanceToDest=distanceToDest + obj2.z - obj1.z
         else:
             distanceToDest=distanceToDest + obj1.z - obj2.z
+        
+        print("distanceBetweenObjects-distanceToDest " + str(distanceToDest))
         
         return distanceToDest
 
