@@ -1,5 +1,0 @@
-Drone location: drone coords: [2,2,14] size: [1,1,1], id: 193 
-currentLocation: ap coords: [2,1,14] size: [1,1,1], id: 6 
-currentLocation: ap coords: [2,1,14] size: [1,1,1], id: 7 
-currentLocation: ap coords: [1,4,14] size: [1,1,1], id: 9 
-autoPilotDestination: apdestination coords: [15,2,2] size: [1,1,1], id: 195 

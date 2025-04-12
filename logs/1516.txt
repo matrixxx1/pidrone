@@ -1,2 +1,0 @@
-Drone location: drone coords: [2,2,14] size: [1,1,1], id: 193 
-currentLocation: ap coords: [2,5,14] size: [1,1,1], id: 19 
