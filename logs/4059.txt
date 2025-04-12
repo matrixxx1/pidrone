@@ -1,0 +1,132 @@
+Drone location: drone coords: [2,2,14] size: [1,1,1], id: 193 
+currentLocation: ap coords: [11,5,14] size: [1,1,1], id: 21 
+currentLocation: ap coords: [9,6,14] size: [1,1,1], id: 21 
+currentLocation: ap coords: [8,6,14] size: [1,1,1], id: 22 
+currentLocation: ap coords: [7,7,14] size: [1,1,1], id: 25 
+autoPilotDestination: apdestination coords: [15,2,2] size: [1,1,1], id: 195 
+autoPilotDestination: apdestination coords: [15,2,2] size: [1,1,1], id: 195 
+autoPilotDestination: apdestination coords: [15,2,2] size: [1,1,1], id: 195 
+autoPilotDestination: apdestination coords: [15,2,2] size: [1,1,1], id: 195 
+autoPilotDestination: apdestination coords: [15,2,2] size: [1,1,1], id: 195 
+This path: 
+This path: 
+This path: 
+ap coords: [11,5,14] size: [1,1,1], id: 0
+ap coords: [7,7,14] size: [1,1,1], id: 0
+ap coords: [8,6,14] size: [1,1,1], id: 0
+ap coords: [9,6,14] size: [1,1,1], id: 0
+ap coords: [9,6,14] size: [1,1,1], id: 0
+ap coords: [3,2,14] size: [1,1,1], id: 1
+ap coords: [3,2,14] size: [1,1,1], id: 1
+ap coords: [3,2,14] size: [1,1,1], id: 1
+ap coords: [3,2,14] size: [1,1,1], id: 1
+ap coords: [3,2,14] size: [1,1,1], id: 1
+ap coords: [1,2,14] size: [1,1,1], id: 2
+ap coords: [1,2,14] size: [1,1,1], id: 2
+ap coords: [1,2,14] size: [1,1,1], id: 2
+ap coords: [1,2,14] size: [1,1,1], id: 2
+ap coords: [1,2,14] size: [1,1,1], id: 2
+ap coords: [4,2,14] size: [1,1,1], id: 3
+ap coords: [4,2,14] size: [1,1,1], id: 3
+ap coords: [4,2,14] size: [1,1,1], id: 3
+ap coords: [2,2,14] size: [1,1,1], id: 4
+ap coords: [2,3,14] size: [1,1,1], id: 3
+ap coords: [2,2,14] size: [1,1,1], id: 4
+ap coords: [3,3,14] size: [1,1,1], id: 4
+ap coords: [2,2,14] size: [1,1,1], id: 4
+ap coords: [3,3,14] size: [1,1,1], id: 5
+ap coords: [3,3,14] size: [1,1,1], id: 5
+ap coords: [3,3,14] size: [1,1,1], id: 4
+ap coords: [1,3,14] size: [1,1,1], id: 5
+ap coords: [3,3,14] size: [1,1,1], id: 5
+ap coords: [3,1,14] size: [1,1,1], id: 6
+ap coords: [3,1,14] size: [1,1,1], id: 6
+ap coords: [4,3,14] size: [1,1,1], id: 6
+ap coords: [1,3,14] size: [1,1,1], id: 5
+ap coords: [3,1,14] size: [1,1,1], id: 6
+ap coords: [4,3,14] size: [1,1,1], id: 7
+ap coords: [4,3,14] size: [1,1,1], id: 7
+ap coords: [4,3,14] size: [1,1,1], id: 6
+ap coords: [5,3,14] size: [1,1,1], id: 7
+ap coords: [4,3,14] size: [1,1,1], id: 7
+ap coords: [2,3,14] size: [1,1,1], id: 8
+ap coords: [5,3,14] size: [1,1,1], id: 7
+ap coords: [6,3,14] size: [1,1,1], id: 8
+ap coords: [2,3,14] size: [1,1,1], id: 8
+ap coords: [2,3,14] size: [1,1,1], id: 8
+ap coords: [3,4,14] size: [1,1,1], id: 9
+ap coords: [7,3,14] size: [1,1,1], id: 9
+ap coords: [6,3,14] size: [1,1,1], id: 8
+ap coords: [5,3,14] size: [1,1,1], id: 9
+ap coords: [5,3,14] size: [1,1,1], id: 9
+ap coords: [4,4,14] size: [1,1,1], id: 10
+ap coords: [6,4,14] size: [1,1,1], id: 10
+ap coords: [5,4,14] size: [1,1,1], id: 9
+ap coords: [4,4,14] size: [1,1,1], id: 10
+ap coords: [4,4,14] size: [1,1,1], id: 10
+ap coords: [2,4,14] size: [1,1,1], id: 11
+ap coords: [5,2,14] size: [1,1,1], id: 10
+ap coords: [6,2,14] size: [1,1,1], id: 11
+ap coords: [6,3,14] size: [1,1,1], id: 11
+ap coords: [5,4,14] size: [1,1,1], id: 12
+ap coords: [5,4,14] size: [1,1,1], id: 11
+ap coords: [6,4,14] size: [1,1,1], id: 11
+ap coords: [7,4,14] size: [1,1,1], id: 12
+ap coords: [5,4,14] size: [1,1,1], id: 12
+ap coords: [4,5,14] size: [1,1,1], id: 13
+ap coords: [3,4,14] size: [1,1,1], id: 12
+ap coords: [4,4,14] size: [1,1,1], id: 12
+ap coords: [5,4,14] size: [1,1,1], id: 13
+ap coords: [5,2,14] size: [1,1,1], id: 13
+ap coords: [5,5,14] size: [1,1,1], id: 14
+ap coords: [6,4,14] size: [1,1,1], id: 13
+ap coords: [8,4,14] size: [1,1,1], id: 14
+ap coords: [7,4,14] size: [1,1,1], id: 13
+ap coords: [6,4,14] size: [1,1,1], id: 14
+ap coords: [3,5,14] size: [1,1,1], id: 15
+ap coords: [7,4,14] size: [1,1,1], id: 14
+ap coords: [7,5,14] size: [1,1,1], id: 15
+ap coords: [6,5,14] size: [1,1,1], id: 14
+ap coords: [5,5,14] size: [1,1,1], id: 15
+ap coords: [4,6,14] size: [1,1,1], id: 16
+ap coords: [6,5,14] size: [1,1,1], id: 15
+ap coords: [8,5,14] size: [1,1,1], id: 16
+ap coords: [7,5,14] size: [1,1,1], id: 15
+ap coords: [6,5,14] size: [1,1,1], id: 16
+ap coords: [5,6,14] size: [1,1,1], id: 17
+ap coords: [6,3,14] size: [1,1,1], id: 16
+ap coords: [6,5,14] size: [1,1,1], id: 17
+ap coords: [5,5,14] size: [1,1,1], id: 16
+ap coords: [4,5,14] size: [1,1,1], id: 17
+ap coords: [3,6,14] size: [1,1,1], id: 18
+ap coords: [7,5,14] size: [1,1,1], id: 17
+ap coords: [9,5,14] size: [1,1,1], id: 18
+ap coords: [6,6,14] size: [1,1,1], id: 17
+ap coords: [7,5,14] size: [1,1,1], id: 18
+ap coords: [4,7,14] size: [1,1,1], id: 19
+ap coords: [5,5,14] size: [1,1,1], id: 18
+ap coords: [10,5,14] size: [1,1,1], id: 19
+ap coords: [7,6,14] size: [1,1,1], id: 18
+ap coords: [8,5,14] size: [1,1,1], id: 19
+ap coords: [5,7,14] size: [1,1,1], id: 20
+ap coords: [6,6,14] size: [1,1,1], id: 19
+ap coords: [9,6,14] size: [1,1,1], id: 20
+ap coords: [9,5,14] size: [1,1,1], id: 20
+ap coords: [5,6,14] size: [1,1,1], id: 19
+ap coords: [3,7,14] size: [1,1,1], id: 21
+ap coords: [11,5,14] size: [1,1,1], id: 21
+ap coords: [8,5,14] size: [1,1,1], id: 20
+ap coords: [8,6,14] size: [1,1,1], id: 21
+ap coords: [8,6,14] size: [1,1,1], id: 20
+ap coords: [4,8,14] size: [1,1,1], id: 22
+ap coords: [9,5,14] size: [1,1,1], id: 21
+ap coords: [10,6,14] size: [1,1,1], id: 22
+ap coords: [10,5,14] size: [1,1,1], id: 22
+ap coords: [9,6,14] size: [1,1,1], id: 21
+ap coords: [6,7,14] size: [1,1,1], id: 23
+ap coords: [8,6,14] size: [1,1,1], id: 22
+ap coords: [9,6,14] size: [1,1,1], id: 23
+ap coords: [5,8,14] size: [1,1,1], id: 24
+ap coords: [8,4,14] size: [1,1,1], id: 23
+ap coords: [9,4,14] size: [1,1,1], id: 24
+ap coords: [7,7,14] size: [1,1,1], id: 25

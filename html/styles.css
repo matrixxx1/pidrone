@@ -1,0 +1,58 @@
+.ground {
+	background-color: gray;
+	opacity: 1;
+}
+
+.tree {
+	background-color: green;
+	opacity: .3;
+}
+
+.poi {
+	background-color: yellow;
+	opacity: 1;
+}
+
+.treetrunk {
+	background-color: brown;
+	opacity: .3;
+}
+
+.drone {
+	background-color: blue;
+	opacity: 1;
+}
+
+.base {
+	background-color: red;
+	opacity: 1;
+}
+
+.apdestination {
+	background-color: yellow;
+	opacity: 1;
+}
+
+.wall {
+	background-color: white;
+	opacity: .3;
+}
+
+
+ 
+
+.worldlayer {
+	position: absolute;
+	border: 1px dashed black;
+}
+
+.mo {
+	position: absolute;
+	border: 1px solid black;
+	border-bottom: 2px solid black;
+	border-right: 2px solid black;
+}
+
+.ip {
+	width: 60px;
+}

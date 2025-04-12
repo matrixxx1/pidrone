@@ -8,16 +8,16 @@ def isNearXY(obj1,obj2):
 
 def distanceBetweenObjects(obj1,obj2):
     
-        print("distanceBetweenObjects-obj1 " + obj1.getLabel())
-        print("distanceBetweenObjects-obj2 " + obj2.getLabel())
+        #print("distanceBetweenObjects-obj1 " + obj1.getLabel())
+        #print("distanceBetweenObjects-obj2 " + obj2.getLabel())
     
         distanceToDest=0
         
-        if not isinstance(obj1.x, int):
-            raise TypeError("obj1.x must be an object, instead its " + x)
+        #if not isinstance(obj1.x, int):
+        #    raise TypeError("obj1.x must be an object, instead its " + x)
 
-        if not isinstance(obj2.x, int):
-            raise TypeError("obj2.x must be an object, instead its " + x)
+        #if not isinstance(obj2.x, int):
+        #    raise TypeError("obj2.x must be an object, instead its " + x)
 
         if (obj2.x > obj1.x):
             distanceToDest=distanceToDest + obj2.x - obj1.x
@@ -34,7 +34,7 @@ def distanceBetweenObjects(obj1,obj2):
         else:
             distanceToDest=distanceToDest + obj1.z - obj2.z
         
-        print("distanceBetweenObjects-distanceToDest " + str(distanceToDest))
+        #print("distanceBetweenObjects-distanceToDest " + str(distanceToDest))
         
         return distanceToDest
 

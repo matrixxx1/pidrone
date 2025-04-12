@@ -13,7 +13,10 @@ import urllib.parse
 
 import helpers_html as html
 import helpers_collisiondetection as collisiondetection 
+import helpers_filesystem as filesystem 
 
+
+useThreads=True
 threads = []
 totalThreads = 0
 
@@ -21,20 +24,23 @@ sys.setrecursionlimit(5000)
 branchCounter = 0
 
 autoPilotDistance=0
-autoPilotStepLimit=1.5 # this ensures that inneficient routes are not considered.
+autoPilotStepLimit=200 # this ensures that inneficient routes are not considered.
 #If the steps are more than 2x the distance, drop the branch
-maxXDeviation=0
-maxYDeviation=0
 
+goodPathsLimit=3
+currentGoodPaths=0
+currentBadPaths=0
 
 level2ApPathsList=[]
 
-#this determines how the world will be rendered to the browser
+aplevel2PathedCoordinates=[]
+
+#this determines how the world will be rendered to the browser	
 perspectiveX="right"    #left or right
 perspectiveY="top"  #top or bottom
 
 
-blocksize = 14 #how many pixels wide and tall a block is in the world. a block represents a cubic meter
+blocksize = 10 #how many pixels wide and tall a block is in the world. a block represents a cubic meter
 padtop= 10 # where to start rendering the world on the up/down axis
 padleft=50 # where to start rendering the world on the left/right axis
 
@@ -119,9 +125,9 @@ class obj():
         left = padleft + (self.y  * blocksize)   + shiftLeftPerspectiveByLayer(self.z) 
          
         #ap level 1
-        #retval = retval + "\n <div   onclick='sD(" + str(self.x) + "," + str(self.y) +  "," + str(self.z + 1) + ")' "
+        retval = retval + "\n <div   onclick='sD(" + str(self.x) + "," + str(self.y) +  "," + str(self.z + 1) + ")' "
         #ap level 2
-        retval = retval + "\n <div   onclick='sD2(" + str(self.x) + "," + str(self.y) +  "," + str(self.z + 1) + ")' "
+        #retval = retval + "\n <div   onclick='sD2(" + str(self.x) + "," + str(self.y) +  "," + str(self.z + 1) + ")' "
         
         retval = retval + "\n title='Object: " + self.getLabel() + "' "
         retval = retval + " style='position: absolute; top: " + str(top) + ";   left: " + str(left) + ";  z-index: " + str(self.z) + ";  "
@@ -153,6 +159,18 @@ drone=""
 autoPilotDestination = None #this holds the destination (as an object) for autopilot when enabled
 base="" 
  
+debugStatements=""
+
+
+
+def getBranchId():
+    global branchCounter
+    branchCounter = branchCounter + 1
+    return branchCounter
+
+def debug(what):
+    global debugStatements
+    debugStatements=debugStatements + "<BR>" + what
 
 def shiftTopPerspectiveByLayer(layer):
     
@@ -235,12 +253,7 @@ def createObstacles():
     for wallCounter in range(1,random.randint(1,5)):
         rndHeight= random.randint(4, maxFlightHeight) 
         addKnownObject(obj("wall",random.randint(4, 30) ,random.randint(4, 30) ,rndHeight ,random.randint(1, 5) ,random.randint(1, 5) , rndHeight ))    
-                
-   # #make a few large walls that can be flown over
-   # for theheight in range(10):
-   #     for wall in range(15):
-   #         addKnownObject(obj("wall",wall,15,theheight+1))
-   #         addKnownObject(obj("wall",wall + 5,19,theheight+1))
+ 
     addKnownObject(obj("wall",7,5,5,15,1,4))
     addKnownObject(obj("wall",17,15,5,15,1,4))
     
@@ -267,11 +280,7 @@ def createObstacles():
     addKnownObject(obj("wall",15,25,maxFlightHeight ,15,1,maxFlightHeight ))     
     addKnownObject(obj("wall",24,5,maxFlightHeight ,1,25, maxFlightHeight ))
     addKnownObject(obj("wall",20,10,maxFlightHeight ,1,25, maxFlightHeight ))          
-
-    
-    
-        
-        
+ 
 def renderActions(self):
     global longTermGoalAchieved
     global droneActions
@@ -308,11 +317,7 @@ def renderActions(self):
     retval = retval + html.makeLink("/?action=perspectiveY&value1=bottom","perspective bottom") + " | "
     retval = retval + html.makeLink("/","Refresh") + " | "
     
-    #retval = retval + "\n<BR><BR> " + html.makeInput("action","ip",action)
-    #retval = retval + html.makeInput("value1","ip",value1)  + html.makeInput("value2","ip",value2)
-    #retval = retval + html.makeInput("value3","ip",value3)  + html.makeInput("value4","ip",value4)
-    #retval = retval + html.makeInput("value5","ip",value5) + html.makeInput("value6","ip",value6)
-   
+ 
     retval = retval + "\n<BR><BR> " + html.makeInput("action","ip")
     retval = retval + html.makeInput("value1","ip")  + html.makeInput("value2","ip")
     retval = retval + html.makeInput("value3","ip")  + html.makeInput("value4","ip")
@@ -336,19 +341,12 @@ def renderScripts(self):
     retval = retval + "\n window.droneX=" + str(drone.x)
     retval = retval + "\n window.droneY=" + str(drone.y)
     retval = retval + "\n window.droneZ=" + str(drone.z)
-    retval = retval + "\n function sD(x,y,z){  window.location.href='/?action=ap&value1=' + x + '&value2=' + y + '&value3=' + z  + '&value4=' + window.droneX  + '&value5=' + window.droneY  + '&value6=' + window.droneZ;}  \n"
-    retval = retval + "\n function sD2(x,y,z){  window.location.href='/?action=aplevel2&value1=' + x + '&value2=' + y + '&value3=' + z  + '&value4=' + window.droneX  + '&value5=' + window.droneY  + '&value6=' + window.droneZ;}  \n"
-    
-    
-    retval = retval + "\n function getIt(frmName){ return document.getElementById(frmName).value; }  \n"
-    retval = retval + "\n function subForm(){ window.location.href='/?action=' + getIt(\"action\") + '&value1=' + getIt(\"value1\") + '&value2=' + getIt(\"value2\") + '&value3=' + getIt(\"value3\") + '&value4=' + getIt(\"value4\") + '&value5=' + getIt(\"value5\") + '&value6=' + getIt(\"value6\"); } \n"
-    retval = retval + "\n function autoPilot(){ if (getIt(\"action\")==\"ap\"){subForm();}} \n"
-    retval = retval + "\n function autoPilotRefresh(){ window.location.href='/';} \n"
-    retval = retval + "\n setTimeout(autoPilot, 2000); \n </script>"
+    retval = retval + "\n </script>  "
+    #retval = retval + "\n setTimeout(autoPilot, 2000); \n </script>"
     
     if (autoPilotDestination != None):
-        retval = retval + "\n <script> setTimeout(autoPilotRefresh, 2000); \n </script>"
-    
+        retval = retval + "\n <script> alert('done'); /* setTimeout(autoPilotRefresh, 1000); */ \n </script>"
+     
     return retval
 
 def renderWorld(self):
@@ -372,22 +370,10 @@ def renderWorld(self):
 
 def renderStyles(self):
     response_content =  "\n<style>"
-    response_content = response_content + "\n .tree { background-color: green; opacity: .3; } "
-    response_content = response_content + "\n .poi { background-color: yellow; opacity: 1; } "
-    response_content = response_content + "\n .treetrunk { background-color: brown; opacity: .3;  } "
-    response_content = response_content + "\n .drone { background-color: blue; opacity: 1;  } "
-    response_content = response_content + "\n .base { background-color: red; opacity: 1;  } "
-    response_content = response_content + "\n .apdestination { background-color: yellow; opacity: 1;  } "
-    response_content = response_content + "\n .wall { background-color: white; opacity: .3;  } "
-    response_content = response_content + "\n .ground { background-color: gray; opacity: 1;  } "
-    #transform-style: preserve-3d; transform: translateY(-10px) rotateX(65deg);    
-    response_content = response_content + "\n .worldlayer { position: absolute; border: 1px dashed black;     } "
-    response_content = response_content + "\n .mo {   position: absolute;   border: 1px solid black; border-bottom: 2px solid black; border-right: 2px solid black;  } "
     response_content = response_content + "\n .shad { opacity: .1;  position: absolute; border: 1px solid black;     "
-
     response_content = response_content + "\n  border-" + perspectiveX + ": " + str(perspectiveTopPad) + "px solid black; border-" + perspectiveY + ": " + str(perspectiveTopPad) + "px solid black;  "
     response_content = response_content + "\n } "
-    response_content = response_content + "\n   .ip {   width: 60px;   } </style>\n"
+    response_content = response_content + "\n   </style>\n"
     return response_content
 
 def renderMap(self):    
@@ -419,17 +405,10 @@ def seedWorld():
     world = obj("world",35,80,15)
     aPath=[]
     theWorld=[]
-    #for y in range(world.y):
-    #    for x in range(world.x):
-    #        for z in range(world.z):
-    #            worldPoint = obj("",x,y,world.z - z,"")
-    #            theWorld.append(worldPoint)
+ 
     
     knownObjs = []
-    #for y in range(world.y):
-    #    for x in range(world.x):
-    #        worldPoint = obj("ground",x,y,1, world.x, world.y)
-    #        addKnownObject(worldPoint)
+ 
             
     worldPoint = obj("ground",1,1, 0, world.x, world.y, 1)
     addKnownObject(worldPoint) 
@@ -641,20 +620,7 @@ def handleDroneMovement():
                     novelPath=False
                 
             if (novelPath ==False and longTermGoalAchieved==False):
-                #caught in loop
-                #droneActions=droneActions + ", Drone has gotten stuck, autopilot failed."
-                #if (currentMoveX > 0):
-                #    droneActions=droneActions + ", Drone has gotten stuck x+, autopilot failed."
-                #    #moving right, set short term goal
-                #if (currentMoveX < 0):
-                #    droneActions=droneActions + ", Drone has gotten stuck x-, autopilot failed."
-                #    #moving left, set short term goal
-                #if (currentMoveY > 0):
-                #    droneActions=droneActions + ", Drone has gotten stuck y+, autopilot failed."
-                #    #moving down, set short term goal
-                #if (currentMoveY < 0):
-                #    droneActions=droneActions + ", Drone has gotten stuck y-, autopilot failed."
-                #    #moving up, set short term goal
+
                 print("Drone got stuck using auto pilot level 1, switching to level 2")
                 performAPLevel2() 
                     
@@ -665,9 +631,7 @@ def handleDroneMovement():
                     drone.x=drone.x + currentMoveX
                     drone.y=drone.y + currentMoveY
                     drone.z=drone.z + currentMoveZ
-                
-            #print("APPATH")
-           # print(len(apPath))
+ 
                 
             removeKnownObjectByName("Drone")
 
@@ -680,11 +644,14 @@ class webRequestHandler(BaseHTTPRequestHandler):
         #if a file was requested, send that. Otherwise send the UI for the drone.
         thefile = self.scriptName(self.path)
         if (thefile != "/"):
+             
+            fileExt = filesystem.getFileExt(thefile)
+            
             try:
                 file_path = os.path.join(os.getcwd(), self.path[1:])
-                with open(file_path, 'rb') as file:
+                with open(file_path, 'rb') as file:                    
                     self.send_response(200)
-                    self.send_header('Content-type', "image/jpeg")
+                    self.send_header('Content-type', html.getMimeType(fileExt))
                     self.end_headers()
                     self.wfile.write(file.read())
                     return
@@ -741,6 +708,13 @@ class webRequestHandler(BaseHTTPRequestHandler):
             addKnownObject(autoPilotDestination)
         
         if (action=="aplevel2"):
+            global currentGoodPaths
+            global currentBadPaths
+            global aplevel2PathedCoordinates
+            
+            aplevel2PathedCoordinates=[]
+            currentGoodPaths=0
+            currentBadPaths=0
             if (autoPilotDestination==None):
                 #print("autoPilotDestination is None, creating")
                 autoPilotDestination = obj("apdestination",int(value1), int(value2), int(value3))
@@ -752,57 +726,65 @@ class webRequestHandler(BaseHTTPRequestHandler):
         if (action=="perspectiveY"): 
             perspectiveY = value1
         
+        
+        response_content=" <html><head><script type='text/javascript' src='/html/drone.js'></script><link rel='stylesheet' href='/html/styles.css'> " + renderScripts(self) + renderStyles(self)  + "</head><body> "
+         
         if (action != "getmap"):
             handleDroneMovement()
-            response_content = renderScripts(self) + renderStyles(self) + renderWorld(self)  + renderMap(self) 
+            response_content = response_content + renderWorld(self)  + renderMap(self) 
         else:
-            response_content = renderScripts(self) + renderStyles(self) + renderMap(self) 
-                 
-        #response_content = "<html><body><h1>Hello, World!</h1></body></html>"
+            response_content =  response_content + renderMap(self) 
+         
+            response_content = response_content + debugStatements
+            response_content = response_content + "</body></html>"
         self.wfile.write(response_content.encode())
 
 def performAPLevel2():
+            global branchCounter
+            branchCounter = 0
+    
             global autoPilotDistance
             global autoPilotDestination
             global threads
             global totalThreads
+            
+            global goodPathsLimit
+            global currentGoodPaths
+            global currentBadPaths
+            global aplevel2PathedCoordinates
+            global useThreads
+            global APMovementMode
+            
             if (autoPilotDestination == None):
                 #print("No destination set")
                 return
             
-            # make sure we dont deviate too much
-            if (drone.x > autoPilotDestination.x):
-                maxXDeviation = (drone.x - autoPilotDestination.x) *  autoPilotStepLimit
-            else: 
-                maxXDeviation = (drone.x - autoPilotDestination.x) *  autoPilotStepLimit
-                 
-            if (drone.y > autoPilotDestination.y):
-                maxYDeviation = (drone.y - autoPilotDestination.y) *  autoPilotStepLimit
-            else: 
-                maxYDeviation = (drone.y - autoPilotDestination.y) *  autoPilotStepLimit
-
-
+            level2ApPathsList=[]
+            aplevel2PathedCoordinates = []
             threads.clear()
             totalThreads=0
             #apDestination=obj("apdestination",int(value1),int(value2), int(value3))
             if (autoPilotDestination == None):
-                #print("No destination set")
+                print("No destination set")
                 return
             else:
-                currentPathLocation = obj("ap",drone.x, drone.y, drone.z)
-                #print("drone: " + drone.getLabel())
-                #print("currentPathLocation: " + currentPathLocation.getLabel())
-                #print("autoPilotDestination: " + autoPilotDestination.getLabel())
+                
                 autoPilotDistance = collisiondetection.distanceBetweenObjects(drone,autoPilotDestination)
-                #print("AP Distance: " + str(autoPilotDistance))
-                addPossiblePath(drone, currentPathLocation, autoPilotDestination,[])
             
-            while (totalThreads > 0):
-                print("Total threads left: " + str(totalThreads) + ", autoPilotDistance: " + str(autoPilotDistance)) 
-                time.sleep(1)
+                newPath = obj("ap",drone.x, drone.y, drone.z)
+                startPath=[]
+                #startPath.append(newPath)
+                addPossiblePath( newPath, startPath)
             
-            for thread in threads:
-                thread.join()
+            #while (totalThreads > 0 and currentGoodPaths < goodPathsLimit ):
+            if (useThreads==True):
+                while (totalThreads > 0 and currentGoodPaths < goodPathsLimit ):
+                    print("Total threads left: " + str(totalThreads) + ", autoPilotDistance: " + str(autoPilotDistance) + ", currentGoodPaths: " + str(currentGoodPaths) + ", aplevel2PathedCoordinates: " + str(len(aplevel2PathedCoordinates)) )
+                    time.sleep(1)
+                for thread in threads:
+                    thread.join()
+            else:
+                print("Total paths left: " + str(len(level2ApPathsList)) + ", autoPilotDistance: " + str(autoPilotDistance) + ", currentGoodPaths: " + str(currentGoodPaths) + ", currentBadPaths: " + str(currentBadPaths) + ", aplevel2PathedCoordinates: " + str(len(aplevel2PathedCoordinates)) )
                 
             #print("Final Paths: " + str(len(level2ApPathsList)))
             apDone =False
@@ -829,184 +811,164 @@ def performAPLevel2():
                 drone.x=mostEfficientRoute[1].x
                 drone.y=mostEfficientRoute[1].y
                 drone.z=mostEfficientRoute[1].z
-                
+                print("Drone moved")
+                APMovementMode=True
                 
             print("All threads finished")   
 
-def addPossiblePath(fromObj,currentObj,toObj,currentPath):
+def addPossiblePath(currentObj,currentPath):
     global threads
     global totalThreads
     global autoPilotDistance
     global autoPilotStepLimit
-
-
-    if len(currentPath) < (autoPilotStepLimit * autoPilotDistance):
-        totalThreads = totalThreads + 1
-        #print("launching thread " + str(totalThreads))
-        t1 = threading.Thread(target = launchThread, args=(fromObj, currentObj,toObj,currentPath))  #create the thread t1
-        threads.append(t1)
-        t1.start()
-        return 0
-
-
+    global level2ApPathsList
+    global aplevel2PathedCoordinates
+    global useThreads
     
+    if len(currentPath) < (autoPilotStepLimit * autoPilotDistance):
+        if (useThreads==True):        
+            totalThreads = totalThreads + 1
+            print("launching thread " + str(totalThreads))
+            t1 = threading.Thread(target = launchThread, args=(currentObj,currentPath))  #create the thread t1
+            #threads.append(t1)
+            t1.start()
+            return 0
+        else:
+            alreadMapped=False
+            for eachLoc in aplevel2PathedCoordinates:
+                if (eachLoc.x==currentObj.x and eachLoc.y==currentObj.y and eachLoc.z==currentObj.z):
+                    alreadMapped=True
+                    print("Preventing duplicate branch Dest " + currentObj.getLabel() + " current: " + eachLoc.getLabel() )
+                    return
+            
+            if (alreadMapped==False):    
+                print("Novel branch " + currentObj.getLabel())
+                aplevel2PathedCoordinates.append(copy.deepcopy(currentObj))
+                newL2Path=possibleAPPath(copy.deepcopy(currentObj),currentPath.copy())
+                level2ApPathsList.append(newL2Path)
+            #else:
+                #print("NOT spawning possibleAPPath")
+        
+    else:
+        print("NOT spawning possibleAPPath, out of efficiency allowance")
 #        newL2Path=possibleAPPath(copy.deepcopy(fromObj),copy.deepcopy(currentObj),copy.deepcopy(toObj),currentPath.copy())
 #        level2ApPathsList.append(newL2Path)
 
-def launchThread(fromObj,currentObj,toObj,currentPath):
+def launchThread(currentObj,currentPath):
     #print("Thread launched")
     global autoPilotDistance
     global autoPilotStepLimit
     global level2ApPathsList
     global totalThreads
     global threads
+    global aplevel2PathedCoordinates
     
-   # print("currentPath: " + str(len(currentPath))  + ", max: " + str(autoPilotStepLimit * autoPilotDistance) )
-    #print("autoPilotStepLimit: " + str(autoPilotStepLimit))
-    #print("autoPilotDistance: " + str(autoPilotDistance))
+ 
+    print("currentObj: " + currentObj.getLabel())
     
     if len(currentPath) < (autoPilotStepLimit * autoPilotDistance):
         #print("spawning possibleAPPath")
-        newL2Path=possibleAPPath(copy.deepcopy(fromObj),copy.deepcopy(currentObj),copy.deepcopy(toObj),currentPath.copy())
+        newL2Path=possibleAPPath(copy.deepcopy(currentObj),currentPath.copy())
         level2ApPathsList.append(newL2Path)
     #else:
         #print("NOT spawning possibleAPPath")
     totalThreads = totalThreads - 1
-    
-def runPaths():
-    global autoPilotDistance
-    changesMade=False
-    doLoop=True
-      
-    while doLoop==True:
-        changesMade=False
-        #print("in loop, Paths: " + str(len(level2ApPathsList)))
-        pathNum=1
-        for killDeadPaths in level2ApPathsList:
-            pathNum = pathNum + 1
-            print("in loop, BranchId #: " + str(killDeadPaths.branchId) + ", coords: " + str(killDeadPaths.currentLocation.x) + "," + str(killDeadPaths.currentLocation.y) + "," + str(killDeadPaths.currentLocation.z) + ", Distance: " + str(autoPilotDistance) + ", Steps: " + str(len(killDeadPaths.recordedPath)))
-            #if (killDeadPaths.branchDead==True):
-            if (killDeadPaths.branchGetsToDestination==False):
-                #print("removing branch id " + str(killDeadPaths.branchId))
-                level2ApPathsList.remove(killDeadPaths)
-                changesMade=True
-             
-            #else:
-                #print("running branch")
-                #killDeadPaths.runPath()
-                #changesMade=True
-                
-        if len(level2ApPathsList) < 1:
-            doLoop=False
-            
-        if (changesMade==False):
-            doLoop=False
+     
 
 class possibleAPPath():
-    def __init__(self, fromLocation, currentLocation, toLocation,copyThisPath):
+    def __init__(self, currentLocation,copyThisPath):
         #print ("new possibleAPPath , current coords: " + str(currentLocation.x) +"," + str(currentLocation.y)  +"," + str(currentLocation.z) )
-        global branchCounter
         global autoPilotDestination
         global autoPilotStepLimit
-        global maxXDeviation
-        global maxYDeviation
+        global currentGoodPaths
+        global currentBadPaths
+
         
-        branchCounter = branchCounter + 1
-        self.branchId=branchCounter
-        
-        self.fromLocation=fromLocation
+        self.branchId=getBranchId()
         self.currentLocation = obj(currentLocation.name,currentLocation.x, currentLocation.y, currentLocation.z)  
-        self.toLocation=toLocation 
+        self.recordedPath=copyThisPath           
+        self.branchGetsToDestination=False     
+
+        filesystem.appendFile("logs/" + str(branchCounter) + ".txt",  "Drone location: " + drone.getLabel() + " \n")
+        filesystem.appendFile("logs/" + str(branchCounter) + ".txt",  "currentLocation: " + currentLocation.getLabel() + " \n")
+        filesystem.appendFile("logs/" + str(branchCounter) + ".txt",  "autoPilotDestination: " + autoPilotDestination.getLabel() + " \n")
+        filesystem.appendFile("logs/" + str(branchCounter) + ".txt",  "This path: \n")
+        filesystem.appendFile("logs/" + str(branchCounter) + ".txt",  self.currentLocation.getLabel() + "\n")
+        for eachLoc in copyThisPath:
+            filesystem.appendFile("logs/" + str(branchCounter) + ".txt",  eachLoc.getLabel()  + "\n")
         
-        self.recordedPath=copyThisPath
-      
-        self.branchDead=False         
-        self.branchGetsToDestination=False        
-         
-        #print ("spawning branch " + str(self.branchId) + "," + self.currentLocation.getLabel() + ", distance: " + str(autoPilotDestination) + ", steps: " + str(len(self.recordedPath)))
-        #self.runPath()
-        
-        if (self.currentLocation.x== self.toLocation.x and self.currentLocation.y== self.toLocation.y and self.currentLocation.z== self.toLocation.z  ):
+        if (currentLocation.x== autoPilotDestination.x and currentLocation.y== autoPilotDestination.y and currentLocation.z== autoPilotDestination.z  ):
             print("made it to dest, cancelling ap")
             self.branchGetsToDestination=True
-            self.branchDead=True 
-            return
-           
-        
-
-        #if too high
-        if (self.currentLocation.z > defaultFlightHeight):
-            self.checkLocation(self.currentLocation.x,self.currentLocation.y,self.currentLocation.z-1)
+            currentGoodPaths = currentGoodPaths + 1
             return
         
+        
+   
+         
+        print ("spawning branch " + str(self.branchId) + "," + self.currentLocation.getLabel() + " , steps: " + str(len(self.recordedPath)))
+        #self.runPath()
+  
         # if near the destination, lower
-        if (collisiondetection.isNearXY(drone,autoPilotDestination)==True):
+        #if (collisiondetection.isNearXY(self.currentLocation,autoPilotDestination)==True):
+        if (self.currentLocation.x==autoPilotDestination.x and self.currentLocation.y==autoPilotDestination.y and self.currentLocation.z>autoPilotDestination.z):
             self.checkLocation(self.currentLocation.x,self.currentLocation.y,self.currentLocation.z-1)
-            return
-
-        #if near the take off point, then focus on gaining altitude before moving
+            
+        else:
+            #if near the take off point, then focus on gaining altitude before moving
+            #if (self.currentLocation.z < defaultFlightHeight):
             if (self.currentLocation.z < defaultFlightHeight):
                 self.checkLocation(self.currentLocation.x,self.currentLocation.y,self.currentLocation.z+1)
+                #self.checkLocation(self.currentLocation.x,self.currentLocation.y,self.currentLocation.z-1)
+                
+    
+        self.checkLocation(self.currentLocation.x+1,self.currentLocation.y,self.currentLocation.z)
          
-
-        # if not near the take off point nor the destination
-        if (self.currentLocation.x < self.currentLocation.x + maxXDeviation):        
-            self.checkLocation(self.currentLocation.x+1,self.currentLocation.y,self.currentLocation.z)
-        
-        if (self.currentLocation.x > self.currentLocation.x - maxXDeviation):  
-            self.checkLocation(self.currentLocation.x-1,self.currentLocation.y,self.currentLocation.z)
-            
-        if (self.currentLocation.y < self.currentLocation.y + maxYDeviation):  
-            self.checkLocation(self.currentLocation.x,self.currentLocation.y+1,self.currentLocation.z)
-        
-        if (self.currentLocation.y > self.currentLocation.y - maxYDeviation):      
-            self.checkLocation(self.currentLocation.x,self.currentLocation.y-1,self.currentLocation.z)
-            
-        self.branchDead=True
+        self.checkLocation(self.currentLocation.x-1,self.currentLocation.y,self.currentLocation.z)
+         
+        self.checkLocation(self.currentLocation.x,self.currentLocation.y+1,self.currentLocation.z)
+         
+        self.checkLocation(self.currentLocation.x,self.currentLocation.y-1,self.currentLocation.z)
+                
+        currentBadPaths = currentBadPaths + 1
         
     def checkLocation(self,x,y,z):
         global knownObjs
-      
+        global currentBadPaths
         
+        for eachLocation in self.recordedPath:
+            if (eachLocation.x== x and eachLocation.y== y and eachLocation.z== z):
+                print("already moved here [" + str(x) + "," + str(y) + "," + str(z) + " ], killing branch ")
+                currentBadPaths = currentBadPaths + 1
+                return        
         
         
         if (x < 1 or y < 1  or z < 1 ):
             #print("branch out of bounds-1")
-            #self.branchDead=True
             return 0
 
         if ( x > world.x ):
             #print("branch out of boundsx-2")
-            #self.branchDead=True
             return 0
         if ( y > world.y ):
             #print("branch out of boundsy-2")
-            #self.branchDead=True
             return 0
         if ( z > world.z):
             #print("branch out of boundsz-2  z: " + str(z) + ", world.z:" + str(world.z))
-            #self.branchDead=True
             return 0
 
-
-
-        for eachLocation in self.recordedPath:
-            if (eachLocation.x== x and eachLocation.y== y and eachLocation.z== z):
-                #print("already moved here, killing branch")
-                alreadyMovedHere=True
-                self.branchDead=True
-                return 0
-
-        self.currentLocation.x=x
-        self.currentLocation.y=y
-        self.currentLocation.z=z
+        newpath = copy.deepcopy(self.currentLocation)
+        newpath.x=x
+        newpath.y=y
+        newpath.z=z
+        newpath.id=len(self.recordedPath)+1
         #print("adding new location to path")
-        self.recordedPath.append(self.currentLocation)
+        self.recordedPath.append(newpath)
         
         checkLoc=collisiondetection.getObjectByCoordinate(x,y,z,knownObjs)
         if (checkLoc==None):  
             #print("New path - spawning branch coords: " + str(self.currentLocation.x) + "," + str(self.currentLocation.y) + "," + str(self.currentLocation.z))
-            addPossiblePath(self.fromLocation, self.currentLocation, self.toLocation, self.recordedPath)
+            addPossiblePath(newpath, self.recordedPath)
             return 1
         #else:
             #print("avoiding object - killing branch")
