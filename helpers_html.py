@@ -5,6 +5,10 @@ def makeLink(href, text):
 def makeInput(id,cls="",value=""):
     return "\n " + id + ": <input type='text' id='" + id + "' class='" + cls + "' value='" + value + "' /> " 
 
+def makeCheckBox(id,cls="",checked=False):
+    return "\n " + id + ": <input type='checkbox' id='" + id + "' class='" + cls + "' checked='" + str(checked) + "' /> " 
+
+
 def getMimeType(fileExt):
     retval = "text/html"
     if (fileExt=="gif" ): 

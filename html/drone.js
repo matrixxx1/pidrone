@@ -7,13 +7,20 @@
 		}
     
     
-    function getIt(frmName){ 
-		return document.getElementById(frmName).value; 
+    function getIt(eleName){ 
+		return document.getElementById(eleName).value; 
 		}  
 		
-    function subForm(){ 
-		window.location.href='/?action=' + getIt("action") + '&value1=' + getIt("value1") + '&value2=' + getIt("value2") + '&value3=' + getIt("value3") + '&value4=' + getIt("value4") + '&value5=' + getIt("value5") + '&value6=' + getIt("value6"); 
+
+    function isChecked(eleName){ 
+		return document.getElementById(eleName).checked; 
+	}  
+
+    function subForm(){
+		if (isChecked(chkPause)==false ) {
+			window.location.href='/?action=' + getIt("action") + '&value1=' + getIt("value1") + '&value2=' + getIt("value2") + '&value3=' + getIt("value3") + '&value4=' + getIt("value4") + '&value5=' + getIt("value5") + '&value6=' + getIt("value6"); 
 		}
+	}
     
 	function autoPilot(){ 
 		if (getIt("action")=="ap"){subForm();}
