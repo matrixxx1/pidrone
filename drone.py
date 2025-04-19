@@ -22,7 +22,7 @@ import camera
 import motor
 import flight
 import leds
-import servos
+import hardware_servos
 from picamera2 import Picamera2
 from time import sleep
 import shutil

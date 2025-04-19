@@ -10,7 +10,7 @@ from vl53l0x import VL53L0X
 import motor
 import flight
 import camera
-import servos
+import hardware_servos
 
 class DroneState:
     IDLE = "IDLE"

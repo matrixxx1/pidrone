@@ -91,47 +91,42 @@ base=""
  
 debugStatements=""
 
-
 class spacialObject(collisiondetection.spacialCoordinate):
-  
-  
+
     def renderIt(self):
-        global perspectiveX
-        global perspectiveY
-        
-   
-            
+        global perspectiveX, perspectiveY
+
         retval = ""
-         
-        #render extra divs to give it a 3d look
-        #if (self.name!="ground" and self.name!="drone" and self.name!="base"):
-            #retval +=  "\n<div  style='top: " + str(int(top+6)) + "; left: " + str(int(left +6)) + "; z-index: " + str(int(self.z)) + "; ' class='shad'></div>\n"
-            #retval +=  "\n<div  style='top: " + str(int(top+4)) + "; left: " + str(int(left +4)) + "; z-index: " + str(int(self.z)) + "; width: " + str(int(blocksize) * self.width) + "px; height: " + str(int(blocksize) * self.height) + "px;' class='shad'></div>\n"
-            #retval +=  "\n<div  style='top: " + str(int(top+2)) + "; left: " + str(int(left +2)) + "; z-index: " + str(int(self.z)) + "; ' class='shad'></div>\n"
-        
-        #render divs to give it depth
-        if (self.name!="ground"):
-            for objectLayer in range( self.z - self.depth , self.z ):
-                renderLayer= self.z - objectLayer
-                top = padtop  + (self.x * blocksize)   + shiftTopPerspectiveByLayer(objectLayer) 
-                left = padleft + (self.y  * blocksize)   + shiftLeftPerspectiveByLayer(objectLayer) 
-                retval +=  "\n<div  title='Shadow-" + str(renderLayer) + ": " + self.getLabel() + "'   style='top: " + str(int(top)) + "; left: " + str(int(left)) + "; z-index: " + str(int(renderLayer)) + "; width: " + str(int(blocksize) * self.width) + "px; height: " + str(int(blocksize) * self.height) + "px; ' class='shad'></div>\n"
-         
-        #render the actual object
-       
-        top = padtop  + (self.x * blocksize)   + shiftTopPerspectiveByLayer(self.z) 
-        left = padleft + (self.y  * blocksize)   + shiftLeftPerspectiveByLayer(self.z) 
-         
-        #ap level 1
-        retval +=  "\n <div   onclick='sD(" + str(self.x) + "," + str(self.y) +  "," + str(self.z + 1) + ")' "
-        #ap level 2
-        #retval +=  "\n <div   onclick='sD2(" + str(self.x) + "," + str(self.y) +  "," + str(self.z + 1) + ")' "
-        
-        retval +=  "\n title='Object: " + self.getLabel() + "' "
-        retval +=  " style='position: absolute; top: " + str(top) + ";   left: " + str(left) + ";  z-index: " + str(self.z) + ";  "
-        retval = retval  + " width: " + str(int(blocksize) * self.width) + "px; height: " + str(int(blocksize) * self.height) + "px;'   class='mo " + self.name + "'></div>" 
+
+        # Render shadows for depth, excluding "ground"
+        if self.name != "ground":
+            for objectLayer in range(self.z - self.depth, self.z):
+                renderLayer = self.z - objectLayer
+                top = padtop + (self.x * blocksize) + shiftTopPerspectiveByLayer(objectLayer)
+                left = padleft + (self.y * blocksize) + shiftLeftPerspectiveByLayer(objectLayer)
+
+                retval += (
+                    f"\n<div title='Shadow-{renderLayer}: {self.getLabel()}' "
+                    f"style='top: {int(top)}; left: {int(left)}; z-index: {int(renderLayer)}; "
+                    f"width: {int(blocksize) * self.width}px; height: {int(blocksize) * self.height}px;' "
+                    "class='shad'></div>\n"
+                )
+
+        # Render the actual object
+        top = padtop + (self.x * blocksize) + shiftTopPerspectiveByLayer(self.z)
+        left = padleft + (self.y * blocksize) + shiftLeftPerspectiveByLayer(self.z)
+
+        # Use sD for AP level 1 (change to sD2 for AP level 2 if needed)
+        retval += (
+            f"\n<div onclick='sD({self.x}, {self.y}, {self.z + 1})' "
+            f"title='Object: {self.getLabel()}' "
+            f"style='position: absolute; top: {top}; left: {left}; z-index: {self.z}; "
+            f"width: {int(blocksize) * self.width}px; height: {int(blocksize) * self.height}px;' "
+            f"class='mo {self.name}'></div>"
+        )
 
         return retval
+
 
 
 def removeKnownObjectByName(objName):
@@ -719,32 +714,26 @@ class webRequestHandler(BaseHTTPRequestHandler):
 
 def makeViewPort():
     global viewPort
-    viewPort = spacialObject("viewPort",35,80,15)
-    if (world.x > drone.x):
-        viewPort.x = drone.x
-        viewPort.width=world.x - drone.x
-    else:
-        viewPort.x = world.x
-        viewPort.width=drone.x - world.x
-        
-    if (world.y > drone.y):
-        viewPort.y = drone.y
-        viewPort.height=world.y - drone.y
-    else:
-        viewPort.y = world.y
-        viewPort.height=drone.y - world.y
-    
-    while viewPort.x < 4:
-        viewPort.x = viewPort.x + 1
-        
-    while viewPort.y < 4:
-        viewPort.y = viewPort.y + 1
-    
-    viewPort.x = viewPort.x - 3
-    viewPort.width = viewPort.width + 6
 
-    viewPort.y = viewPort.y - 3
-    viewPort.height = viewPort.height + 6
+    # Create initial viewport
+    viewPort = spacialObject("viewPort", 1, 1, 1)
+
+    # Calculate X range
+    viewPort.x = min(drone.x, world.x)
+    viewPort.width = abs(drone.x - world.x)
+
+    # Calculate Y range
+    viewPort.y = min(drone.y, world.y)
+    viewPort.height = abs(drone.y - world.y)
+
+    # Ensure minimum margins
+    viewPort.x = max(1, viewPort.x - 3)
+    viewPort.y = max(1, viewPort.y - 3)
+
+    # Expand viewport for margin buffer
+    viewPort.width += 6
+    viewPort.height += 6
+
 
 def performAPLevel2():
             makeViewPort()

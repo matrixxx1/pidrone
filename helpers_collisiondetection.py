@@ -1,10 +1,8 @@
 #check if object 1 and object 2 are next to each other on the x and y axis, disregards the z axis
 def isNearXY(obj1,obj2):
-    
-    if (obj1.x==obj2.x or obj1.x+1==obj2.x or obj1.x-1==obj2.x):
-        if (obj1.y==obj2.y or obj1.y+1==obj2.y or obj1.y-1==obj2.y):
-          return True
-    return False
+    x_diff = abs(obj1.x - obj2.x)
+    y_diff = abs(obj1.y - obj2.y)
+    return x_diff <= 1 and y_diff <= 1
 
 
 
@@ -68,39 +66,22 @@ class spacialCoordinate():
 
 
 def distanceBetweenObjects(obj1,obj2):
-    
-        #print("distanceBetweenObjects-obj1 " + obj1.getLabel())
-        #print("distanceBetweenObjects-obj2 " + obj2.getLabel())
-    
-        distanceToDest=0
-        
-        #if not isinstance(obj1.x, int):
-        #    raise TypeError("obj1.x must be an object, instead its " + x)
-
-        #if not isinstance(obj2.x, int):
-        #    raise TypeError("obj2.x must be an object, instead its " + x)
-
-        if (obj2.x > obj1.x):
-            distanceToDest=distanceToDest + obj2.x - obj1.x
-        else:
-            distanceToDest=distanceToDest + obj1.x - obj2.x
-            
-        if (obj2.y > obj1.y):
-            distanceToDest=distanceToDest + obj2.y - obj1.y
-        else:
-            distanceToDest=distanceToDest + obj1.y - obj2.y
-            
-        if (obj2.z > obj1.z):
-            distanceToDest=distanceToDest + obj2.z - obj1.z
-        else:
-            distanceToDest=distanceToDest + obj1.z - obj2.z
-        
-        #print("distanceBetweenObjects-distanceToDest " + str(distanceToDest))
-        
-        return distanceToDest
+    return abs(obj2.x - obj1.x) + abs(obj2.y - obj1.y) + abs(obj2.z - obj1.z)
 
 #check if a coordinate is safe to move to, if it is, it returns None. If not safe, it returns the object
-def getObjectByCoordinate(x,y,z,knownObjs):
+def getObjectByCoordinate(x, y, z, knownObjs):
+    for obj in knownObjs:
+        if obj.name not in {"drone", "apdestination"}:
+            x1, x2 = obj.x1(), obj.x2()
+            y1, y2 = obj.y1(), obj.y2()
+            z1, z2 = obj.z1(), obj.z2()
+
+            if x1 <= x <= x2 and y1 <= y <= y2 and z2 <= z <= z1:
+                return obj
+    return None
+
+
+def getObjectByCoordinateOLD(x,y,z,knownObjs):
     
     for objs in knownObjs:
         if (objs.name!="drone" and objs.name!="apdestination"):
