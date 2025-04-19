@@ -1,0 +1,5 @@
+RPi.GPIO>=0.7.0
+picamera2>=0.3.9
+Pillow>=9.0.0
+adafruit-circuitpython-vl53l0x>=1.2.0
+adafruit-circuitpython-adxl34x>=1.11.0 

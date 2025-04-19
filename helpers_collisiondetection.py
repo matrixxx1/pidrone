@@ -6,6 +6,67 @@ def isNearXY(obj1,obj2):
           return True
     return False
 
+
+
+
+class spacialCoordinate():
+    def x1(self):
+        return int(self.x)
+        
+    def y1(self):
+        return int(self.y )
+    
+    def z1(self):
+        return int(self.z )
+    
+    def x2(self):
+        return int(self.x) + int(self.width)
+        
+    def y2(self):
+        return int(self.y) + int(self.height)
+    
+    def z2(self):
+        return int(self.z) - int(self.depth)
+    
+    def __init__(self, name, x, y,z, objHeight=1, objWidth=1, objDepth=1):
+        if not isinstance(x, int):
+            raise TypeError("x must be an integer, instead its " + x)
+        if not isinstance(y, int):
+            raise TypeError("y must be an integer, instead its " + y)
+        if not isinstance(z, int):
+            raise TypeError("z must be an integer, instead its " + z)
+        if not isinstance(objHeight, int):
+            raise TypeError("objHeight must be an integer, instead its " + objHeight)
+        if not isinstance(objWidth, int):
+            raise TypeError("objWidth must be an integer, instead its " + objWidth)
+        if not isinstance(objDepth, int):
+            raise TypeError("objDepth must be an integer, instead its " + objDepth)
+        self.name=name
+        self.x = x
+        self.y = y
+        self.z= z
+        self.height=objHeight
+        self.width=objWidth
+        self.depth=objDepth
+        self.id=0
+        self.note=""
+        
+    def getLabel(self):
+        retval = self.name + " coords: [" + str(self.x) +"," + str(self.y) + "," + str(self.z) + "]"
+        if (self.width>1 or self.height > 1 or self.depth > 1):
+            retval = retval + ", size: [" + str(self.width) +"," + str(self.height) + "," + str(self.depth)  + "]"
+        if (self.id > 0):
+            retval = retval +" , id: " + str(self.id)
+        if len(self.note) > 0:
+            retval = retval +" , note: " + str(self.note)
+        
+        return retval
+  
+
+    
+
+
+
 def distanceBetweenObjects(obj1,obj2):
     
         #print("distanceBetweenObjects-obj1 " + obj1.getLabel())
