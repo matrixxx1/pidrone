@@ -8,8 +8,7 @@ import time
 import urllib.parse
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
-
-
+ 
 import helpers_html as html
 import helpers_collisiondetection as collisiondetection 
 import helpers_filesystem as filesystem 
@@ -287,13 +286,6 @@ def renderActions(self):
     retval +=  "\n <input type='button' value='run' onclick='subForm();'>\n "
     return retval
 
-def resetAP():
-    global longTermGoalAchieved, droneActions, autoPilotDestination, movementPerformed
-    
-    movementPerformed=False
-    longTermGoalAchieved=False     
-    autoPilotDestination=None        
-    remove_known_object_by_name("apdestination")
 
 def renderScripts(self):
     retval = "\n <script>  "
@@ -356,10 +348,10 @@ def renderMap(self):
 
 
 def seedWorld():
-    global world, drone, base, knownObjs, action, droneActions,theWorld
+    global world, drone, base, knownObjs, action, droneActions,theWorld, apPath
     
     world = spacialObject("world",35,80,15)
-    aPath=[]
+    apPath=[]
     theWorld=[]
  
     
@@ -379,6 +371,411 @@ def seedWorld():
      
      
 seedWorld()
+
+class webRequestHandler(BaseHTTPRequestHandler):
+    
+    def scriptName(self,url):
+        return (url + "?").split("?")[0]
+    
+    def do_GET(self):
+        global requestId
+        
+        requestId = requestId + 1
+        
+        #if a file was requested, send that. Otherwise send the UI for the drone.
+        thefile = self.scriptName(self.path)
+        if (thefile != "/"):
+             
+            fileExt = filesystem.getFileExt(thefile)
+            
+            try:
+                file_path = os.path.join(os.getcwd(), self.path[1:])
+                with open(file_path, 'rb') as file:                    
+                    self.send_response(200)
+                    self.send_header('Content-type', html.getMimeType(fileExt))
+                    self.end_headers()
+                    self.wfile.write(file.read())
+                    return
+            except FileNotFoundError:
+                 self.send_response(404)
+                 self.send_header('Content-type', 'text/plain')
+                 self.end_headers()
+                 self.wfile.write("File [" + self.path + "] not found")
+                 return
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'text/plain')
+                self.end_headers()
+                self.wfile.write(str(e).encode())
+                return
+        
+        #request wasnt for a file, send drone UI
+        
+        global longTermGoalAchieved
+        global droneActions
+        global world
+        global query_string
+        global action
+        global value1
+        global value2
+        global value3
+        global value4
+        global value5
+        global value6
+        global apPath
+        global autoPilotDestination
+        global autoPilotDistance
+        global perspectiveX
+        global perspectiveY
+        global totalThreads
+        
+        longTermGoalAchieved=False
+        
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+         
+        parsed_path = urllib.parse.urlparse(self.path)
+        query_string = parsed_path.query
+        loadQS() 
+        
+        # make a new random world
+        if (action=="randomworld"):
+            seedWorld()
+                    
+        if (action=="ap"):
+            
+            resetAP()
+            autoPilotDestination = spacialObject("apdestination",int(value1), int(value2), int(value3))
+            addKnownObject(autoPilotDestination)
+        
+        if (action=="aplevel2"):
+            global currentGoodPaths
+            global currentBadPaths
+            global aplevel2PathedCoordinates
+            
+            aplevel2PathedCoordinates=[]
+            currentGoodPaths=0
+            currentBadPaths=0
+            if (autoPilotDestination==None):
+                #print("autoPilotDestination is None, creating")
+                autoPilotDestination = spacialObject("apdestination",int(value1), int(value2), int(value3))
+            performAPLevel2()
+             
+        if (action=="perspectiveX"): 
+            perspectiveX = value1
+        
+        if (action=="perspectiveY"): 
+            perspectiveY = value1
+        
+        
+        response_content=" <html><head><script type='text/javascript' src='/html/drone.js'></script><link rel='stylesheet' href='/html/styles.css'> " + renderScripts(self) + renderStyles(self)  + "</head><body> "
+         
+        if (action != "getmap"):
+            perform_ap_level_1()
+            response_content +=  renderWorld(self)  + renderMap(self) 
+        else:
+            response_content =  response_content + renderMap(self) + debugStatements
+            response_content +=  "</body></html>"
+        self.wfile.write(response_content.encode())
+
+
+class possibleAPPath:
+    global requestId
+    global defaultFlightHeight
+    global drone
+    global knownObjs
+    global viewPort
+    global maxApDeviation
+
+    def __init__(self, current_location, current_path, from_branch):
+        self.branch_id = get_branch_id()
+        self.distanceToDest = collisiondetection.distanceBetweenObjects(current_location, autoPilotDestination)
+
+        if self.distanceToDest > maxApDeviation:
+            return
+
+        self.current_location = spacialObject(
+            current_location.name,
+            current_location.x,
+            current_location.y,
+            current_location.z
+        )
+        self.recorded_path = copy.deepcopy(current_path)
+        self.branch_gets_to_destination = False
+
+        dest_file = f"logs/{requestId}_{from_branch}_{branchCounter}.txt"
+        self._log_initial_state(dest_file, current_location, from_branch)
+
+        if self._is_at_destination(current_location):
+            self._handle_destination_reached(dest_file)
+            return
+
+        self._log(f"Spawned branch {self.branch_id}, {self.current_location.getLabel()}, steps: {len(self.recorded_path)}", dest_file)
+
+        if self._should_lower_to_reach_destination():
+            self.check_location(self.current_location.x, self.current_location.y, self.current_location.z - 1, dest_file)
+        elif self.current_location.z < defaultFlightHeight:
+            self._log("Drone is below ideal flight height, raising", dest_file)
+            self.check_location(self.current_location.x, self.current_location.y, self.current_location.z + 1, dest_file)
+            return
+
+        # Explore horizontal directions
+        self._explore_adjacent(dest_file)
+
+        global currentBadPaths
+        currentBadPaths += 1
+
+    def _is_at_destination(self, location):
+        return (
+            location.x == autoPilotDestination.x and
+            location.y == autoPilotDestination.y and
+            location.z == autoPilotDestination.z
+        )
+
+    def _handle_destination_reached(self, dest_file):
+        global currentGoodPaths, mostEfficient, mostEfficientRoute
+        print("Made it to destination")
+        self.branch_gets_to_destination = True
+        currentGoodPaths += 1
+        self._log("Made it to destination!", dest_file)
+
+        mostEfficient = 99999999
+        mostEfficientRoute = []
+
+        if len(self.recorded_path) < mostEfficient:
+            mostEfficient = len(self.recorded_path)
+            mostEfficientRoute = self.recorded_path
+
+    def _log_initial_state(self, dest_file, current_location, from_branch):
+        self._log(f"Starting branch, launched from {from_branch}", dest_file)
+        self._log(f"Drone location: {drone.getLabel()}", dest_file)
+        self._log(f"Current location: {current_location.getLabel()}", dest_file)
+        self._log(f"AutoPilot Destination: {autoPilotDestination.getLabel()}", dest_file)
+        self._log("This path:", dest_file)
+        self._log(self.current_location.getLabel(), dest_file)
+        for loc in self.recorded_path:
+            self._log(loc.getLabel(), dest_file)
+
+    def _explore_adjacent(self, dest_file):
+        directions = [
+            (1, 0, 0), (-1, 0, 0),
+            (0, 1, 0), (0, -1, 0)
+        ]
+        for dx, dy, dz in directions:
+            self.check_location(
+                self.current_location.x + dx,
+                self.current_location.y + dy,
+                self.current_location.z + dz,
+                dest_file
+            )
+
+    def _should_lower_to_reach_destination(self):
+        return (
+            self.current_location.x == autoPilotDestination.x and
+            self.current_location.y == autoPilotDestination.y and
+            self.current_location.z > autoPilotDestination.z
+        )
+
+    def _log(self, msg, dest_file):
+        filesystem.appendFile(dest_file, msg + "\n")
+
+    def check_location(self, x, y, z, dest_file):
+        new_path = copy.deepcopy(self.current_location)
+        new_path.x, new_path.y, new_path.z = x, y, z
+        new_path.id = len(self.recorded_path) + 1
+        new_path.note = (
+            f"Added by BranchId: {self.branch_id}, "
+            f"Distance to destination: {self.distanceToDest}, "
+            f"maxApDeviation: {maxApDeviation}"
+        )
+
+        self._log(f"Checking location {new_path.getLabel()}", dest_file)
+
+        if self._has_visited(new_path):
+            self._log(f"Already moved to this location in this branch {new_path.getLabel()}", dest_file)
+            global currentBadPaths
+            currentBadPaths += 1
+            return
+
+        if not self._is_in_bounds(new_path, dest_file):
+            return
+
+        self.recorded_path.append(new_path)
+
+        check_obj = collisiondetection.getObjectByCoordinate(new_path.x, new_path.y, new_path.z, knownObjs)
+        if check_obj is None:
+            self._log(f"Adding possible path {new_path.getLabel()}", dest_file)
+            addPossiblePath(new_path, self.recorded_path, self.branch_id)
+        else:
+            self._log(f"Hit object {check_obj.getLabel()}", dest_file)
+
+    def _has_visited(self, location):
+        return any(
+            loc.x == location.x and loc.y == location.y and loc.z == location.z
+            for loc in self.recorded_path
+        )
+
+    def _is_in_bounds(self, location, dest_file):
+        if location.x < 1 or location.y < 1 or location.z < 1:
+            self._log(f"Out of bounds {location.getLabel()}", dest_file)
+            return False
+        if location.x > world.x or location.y > world.y or location.z > world.z:
+            self._log(f"Out of bounds {location.getLabel()}", dest_file)
+            return False
+        if not (viewPort.x <= location.x <= viewPort.x2() and viewPort.y <= location.y <= viewPort.y2()):
+            self._log(f"Out of viewport bounds {location.getLabel()}", dest_file)
+            return False
+        self._log(f"viewPort: {viewPort.getLabel()}", dest_file)
+        return True
+    
+
+
+
+def launch_ap_level_2_threaded(currentObj,currentPath,fromBranch):
+    #print("Thread launched")
+    global autoPilotDistance, autoPilotStepLimit, level2ApPathsList, aplevel2PathedCoordinates
+    global totalThreads, threads
+ 
+    
+ 
+    print("currentObj: " + currentObj.getLabel())
+    
+    if len(currentPath) < (maxApDeviation):
+        #print("spawning possibleAPPath")
+        newL2Path=possibleAPPath(copy.deepcopy(currentObj),currentPath.copy(),fromBranch)
+        level2ApPathsList.append(newL2Path)
+    #else:
+        #print("NOT spawning possibleAPPath")
+    totalThreads = totalThreads - 1
+     
+
+
+
+
+def addPossiblePath(co,cp, fb):
+    global threads, totalThreads, useThreads
+    global autoPilotDistance, autoPilotStepLimit, aplevel2PathedCoordinates, maxApDeviation,preventDuplicateBranches
+       
+    currentObj = copy.deepcopy(co)
+    currentPath = copy.deepcopy(cp)
+    fromBranch = fb
+    
+    currentPathLen = collisiondetection.distanceBetweenObjects(currentObj, autoPilotDestination)
+    if currentPathLen > maxApDeviation:
+        return  
+
+ 
+    if len(currentPath) < (maxApDeviation):
+        if (useThreads==True):        
+            totalThreads = totalThreads + 1
+            #print("launching thread " + str(totalThreads))
+            t1 = threading.Thread(target = launch_ap_level_2_threaded, args=(currentObj,currentPath,fromBranch))  #create the thread t1
+            #threads.append(t1)
+            t1.start()
+            return 0
+        else:
+            alreadMapped=False
+            if (preventDuplicateBranches==True):                
+                for eachLoc in aplevel2PathedCoordinates:
+                    if (eachLoc.x==currentObj.x and eachLoc.y==currentObj.y and eachLoc.z==currentObj.z):
+                        alreadMapped=True
+                        #print("Preventing duplicate branch Dest " + currentObj.getLabel() + " current: " + eachLoc.getLabel() )
+                        return
+                
+            if (alreadMapped==False):    
+                #print("Novel branch " + currentObj.getLabel())
+                aplevel2PathedCoordinates.append(currentObj)
+                newL2Path=possibleAPPath(currentObj,currentPath, fromBranch)
+                level2ApPathsList.append(newL2Path)
+            #else:
+                #print("NOT spawning possibleAPPath")
+        
+#    else:
+  #      print("NOT spawning possibleAPPath, out of efficiency allowance: len(currentPath) " + str(len(currentPath)) + ", max: " + str(maxApDeviation))
+#        newL2Path=possibleAPPath(copy.deepcopy(fromObj),copy.deepcopy(currentObj),copy.deepcopy(toObj),currentPath.copy())
+#        level2ApPathsList.append(newL2Path)
+
+
+def performAPLevel2():
+    makeViewPort()
+    global branchCounter
+    branchCounter = 0
+
+    global mostEfficient ,  mostEfficientRoute, autoPilotDistance, autoPilotDestination, aplevel2PathedCoordinates,  goodPathsLimit, currentGoodPaths,currentBadPaths, APMovementMode, maxApDeviation
+    global threads, totalThreads, useThreads
+ 
+    if (autoPilotDestination == None):
+        #print("No destination set")
+        return
+    
+    branchCounter = 0
+    mostEfficient = 99999999
+    mostEfficientRoute = []
+    
+    threads = []
+    totalThreads=0
+    
+    
+    currentGoodPaths = 0
+    currentBadPaths = 0
+    aplevel2PathedCoordinates=[]
+    
+    level2ApPathsList=[]
+    aplevel2PathedCoordinates = []
+    threads.clear()
+    totalThreads=0
+    #apDestination=spacialObject("apdestination",int(value1),int(value2), int(value3))
+    if (autoPilotDestination == None):
+        print("No destination set")
+        return
+    else:
+        
+        autoPilotDistance = collisiondetection.distanceBetweenObjects(drone,autoPilotDestination)
+        maxApDeviation=int(autoPilotStepLimit * autoPilotDistance)
+        
+        newPath = spacialObject("ap",drone.x, drone.y, drone.z)
+        startPath=[]
+        #startPath.append(newPath)
+        addPossiblePath( newPath, startPath, 0)
+    
+    #while (totalThreads > 0 and currentGoodPaths < goodPathsLimit ):
+    if (useThreads==True):
+        while (totalThreads > 0 and currentGoodPaths < goodPathsLimit ):
+            print("Total threads left: " + str(totalThreads) + ", autoPilotDistance: " + str(autoPilotDistance) + ", currentGoodPaths: " + str(currentGoodPaths) + ", aplevel2PathedCoordinates: " + str(len(aplevel2PathedCoordinates)) )
+            time.sleep(1)
+        for thread in threads:
+            thread.join()
+    else:
+        print("Total paths left: " + str(len(level2ApPathsList)) + ", autoPilotDistance: " + str(autoPilotDistance) + ", currentGoodPaths: " + str(currentGoodPaths) + ", currentBadPaths: " + str(currentBadPaths) + ", aplevel2PathedCoordinates: " + str(len(aplevel2PathedCoordinates)) )
+        
+    print("Final Paths: " + str(len(level2ApPathsList)) + ", currentGoodPaths: " + str(currentGoodPaths)  + ", currentBadPaths: " + str(currentBadPaths) + ", len(mostEfficientRoute): " + str(len(mostEfficientRoute)) + ", str(mostEfficient): " + str(mostEfficient))
+    apDone =False
+    
+            
+    if len(mostEfficientRoute) == 0:
+        print("Didnt make it to destination")
+        refreshGUI = False
+    else:
+        refreshGUI = True
+        print("Made it to destination in " + str(mostEfficient) + " moves")
+        print("Path to destination")
+        
+        for pathCounter in range(1, len(mostEfficientRoute)):
+            print("Step: " + str(pathCounter) + ", " + str(mostEfficientRoute[pathCounter].x) + "," + str(mostEfficientRoute[pathCounter].y) + "," + str(mostEfficientRoute[pathCounter].z))
+
+        #move drone to first step in AP path
+        drone.x=mostEfficientRoute[1].x
+        drone.y=mostEfficientRoute[1].y
+        drone.z=mostEfficientRoute[1].z
+        print("Drone moved")
+        APMovementMode=True
+        
+    print("All threads finished")   
+
+
+
+
 
 def perform_ap_level_1():
     
@@ -574,114 +971,17 @@ def perform_ap_level_1():
                 
             remove_known_object_by_name("Drone")
 
-class webRequestHandler(BaseHTTPRequestHandler):
+
+
+
+def resetAP():
+    global longTermGoalAchieved, droneActions, autoPilotDestination, movementPerformed
     
-    def scriptName(self,url):
-        return (url + "?").split("?")[0]
-    
-    def do_GET(self):
-        global requestId
-        
-        requestId = requestId + 1
-        
-        #if a file was requested, send that. Otherwise send the UI for the drone.
-        thefile = self.scriptName(self.path)
-        if (thefile != "/"):
-             
-            fileExt = filesystem.getFileExt(thefile)
-            
-            try:
-                file_path = os.path.join(os.getcwd(), self.path[1:])
-                with open(file_path, 'rb') as file:                    
-                    self.send_response(200)
-                    self.send_header('Content-type', html.getMimeType(fileExt))
-                    self.end_headers()
-                    self.wfile.write(file.read())
-                    return
-            except FileNotFoundError:
-                 self.send_response(404)
-                 self.send_header('Content-type', 'text/plain')
-                 self.end_headers()
-                 self.wfile.write("File [" + self.path + "] not found")
-                 return
-            except Exception as e:
-                self.send_response(500)
-                self.send_header('Content-type', 'text/plain')
-                self.end_headers()
-                self.wfile.write(str(e).encode())
-                return
-        
-        #request wasnt for a file, send drone UI
-        
-        global longTermGoalAchieved
-        global droneActions
-        global world
-        global query_string
-        global action
-        global value1
-        global value2
-        global value3
-        global value4
-        global value5
-        global value6
-        global apPath
-        global autoPilotDestination
-        global autoPilotDistance
-        global perspectiveX
-        global perspectiveY
-        global totalThreads
-        
-        longTermGoalAchieved=False
-        
-        self.send_response(200)
-        self.send_header('Content-type', 'text/html')
-        self.end_headers()
-         
-        parsed_path = urllib.parse.urlparse(self.path)
-        query_string = parsed_path.query
-        loadQS() 
-        
-        # make a new random world
-        if (action=="randomworld"):
-            seedWorld()
-                    
-        if (action=="ap"):
-            
-            resetAP()
-            autoPilotDestination = spacialObject("apdestination",int(value1), int(value2), int(value3))
-            addKnownObject(autoPilotDestination)
-        
-        if (action=="aplevel2"):
-            global currentGoodPaths
-            global currentBadPaths
-            global aplevel2PathedCoordinates
-            
-            aplevel2PathedCoordinates=[]
-            currentGoodPaths=0
-            currentBadPaths=0
-            if (autoPilotDestination==None):
-                #print("autoPilotDestination is None, creating")
-                autoPilotDestination = spacialObject("apdestination",int(value1), int(value2), int(value3))
-            performAPLevel2()
-             
-        if (action=="perspectiveX"): 
-            perspectiveX = value1
-        
-        if (action=="perspectiveY"): 
-            perspectiveY = value1
-        
-        
-        response_content=" <html><head><script type='text/javascript' src='/html/drone.js'></script><link rel='stylesheet' href='/html/styles.css'> " + renderScripts(self) + renderStyles(self)  + "</head><body> "
-         
-        if (action != "getmap"):
-            perform_ap_level_1()
-            response_content +=  renderWorld(self)  + renderMap(self) 
-        else:
-            response_content =  response_content + renderMap(self) 
-         
-            response_content +=  debugStatements
-            response_content +=  "</body></html>"
-        self.wfile.write(response_content.encode())
+    movementPerformed=False
+    longTermGoalAchieved=False     
+    autoPilotDestination=None        
+    remove_known_object_by_name("apdestination")
+
 
 def makeViewPort():
     global viewPort
@@ -697,284 +997,13 @@ def makeViewPort():
     viewPort.width = max(drone.y, autoPilotDestination.y) - viewPort.y      
 
     # Ensure minimum margins
-    viewPort.x = max(1, viewPort.x - 3)
-    viewPort.y = max(1, viewPort.y - 3)
+    viewPort.x = max(1, viewPort.x - 2)
+    viewPort.y = max(1, viewPort.y - 2)
 
     # Expand viewport for margin buffer
-    viewPort.width += 6
-    viewPort.height += 6
-
-
-def performAPLevel2():
-    makeViewPort()
-    global branchCounter
-    branchCounter = 0
-
-    global mostEfficient ,  mostEfficientRoute, autoPilotDistance, autoPilotDestination, aplevel2PathedCoordinates,  goodPathsLimit, currentGoodPaths,currentBadPaths, APMovementMode, maxApDeviation
-    global threads, totalThreads, useThreads
+    viewPort.width +=4
+    viewPort.height += 4
  
-    if (autoPilotDestination == None):
-        #print("No destination set")
-        return
-    
-    branchCounter = 0
-    mostEfficient = 99999999
-    mostEfficientRoute = []
-    
-    threads = []
-    totalThreads=0
-    
-    
-    currentGoodPaths = 0
-    currentBadPaths = 0
-    aplevel2PathedCoordinates=[]
-    
-    level2ApPathsList=[]
-    aplevel2PathedCoordinates = []
-    threads.clear()
-    totalThreads=0
-    #apDestination=spacialObject("apdestination",int(value1),int(value2), int(value3))
-    if (autoPilotDestination == None):
-        print("No destination set")
-        return
-    else:
-        
-        autoPilotDistance = collisiondetection.distanceBetweenObjects(drone,autoPilotDestination)
-        maxApDeviation=int(autoPilotStepLimit * autoPilotDistance)
-        
-        newPath = spacialObject("ap",drone.x, drone.y, drone.z)
-        startPath=[]
-        #startPath.append(newPath)
-        addPossiblePath( newPath, startPath, 0)
-    
-    #while (totalThreads > 0 and currentGoodPaths < goodPathsLimit ):
-    if (useThreads==True):
-        while (totalThreads > 0 and currentGoodPaths < goodPathsLimit ):
-            print("Total threads left: " + str(totalThreads) + ", autoPilotDistance: " + str(autoPilotDistance) + ", currentGoodPaths: " + str(currentGoodPaths) + ", aplevel2PathedCoordinates: " + str(len(aplevel2PathedCoordinates)) )
-            time.sleep(1)
-        for thread in threads:
-            thread.join()
-    else:
-        print("Total paths left: " + str(len(level2ApPathsList)) + ", autoPilotDistance: " + str(autoPilotDistance) + ", currentGoodPaths: " + str(currentGoodPaths) + ", currentBadPaths: " + str(currentBadPaths) + ", aplevel2PathedCoordinates: " + str(len(aplevel2PathedCoordinates)) )
-        
-    print("Final Paths: " + str(len(level2ApPathsList)) + ", currentGoodPaths: " + str(currentGoodPaths)  + ", currentBadPaths: " + str(currentBadPaths) + ", len(mostEfficientRoute): " + str(len(mostEfficientRoute)) + ", str(mostEfficient): " + str(mostEfficient))
-    apDone =False
-    
-            
-    if len(mostEfficientRoute) == 0:
-        print("Didnt make it to destination")
-        refreshGUI = False
-    else:
-        refreshGUI = True
-        print("Made it to destination in " + str(mostEfficient) + " moves")
-        print("Path to destination")
-        
-        for pathCounter in range(1, len(mostEfficientRoute)):
-            print("Step: " + str(pathCounter) + ", " + str(mostEfficientRoute[pathCounter].x) + "," + str(mostEfficientRoute[pathCounter].y) + "," + str(mostEfficientRoute[pathCounter].z))
-
-        #move drone to first step in AP path
-        drone.x=mostEfficientRoute[1].x
-        drone.y=mostEfficientRoute[1].y
-        drone.z=mostEfficientRoute[1].z
-        print("Drone moved")
-        APMovementMode=True
-        
-    print("All threads finished")   
-
-def addPossiblePath(co,cp, fb):
-    
-    currentObj = copy.deepcopy(co)
-    currentPath = copy.deepcopy(cp)
-    fromBranch = fb
-    
-    global threads, totalThreads, useThreads
-    global autoPilotDistance, autoPilotStepLimit, aplevel2PathedCoordinates, maxApDeviation,preventDuplicateBranches
-    
-    if len(currentPath) < (maxApDeviation):
-        if (useThreads==True):        
-            totalThreads = totalThreads + 1
-            #print("launching thread " + str(totalThreads))
-            t1 = threading.Thread(target = launchThread, args=(currentObj,currentPath,fromBranch))  #create the thread t1
-            #threads.append(t1)
-            t1.start()
-            return 0
-        else:
-            alreadMapped=False
-            if (preventDuplicateBranches==True):                
-                for eachLoc in aplevel2PathedCoordinates:
-                    if (eachLoc.x==currentObj.x and eachLoc.y==currentObj.y and eachLoc.z==currentObj.z):
-                        alreadMapped=True
-                        #print("Preventing duplicate branch Dest " + currentObj.getLabel() + " current: " + eachLoc.getLabel() )
-                        return
-                
-            if (alreadMapped==False):    
-                #print("Novel branch " + currentObj.getLabel())
-                aplevel2PathedCoordinates.append(currentObj)
-                newL2Path=possibleAPPath(currentObj,currentPath, fromBranch)
-                level2ApPathsList.append(newL2Path)
-            #else:
-                #print("NOT spawning possibleAPPath")
-        
-#    else:
-  #      print("NOT spawning possibleAPPath, out of efficiency allowance: len(currentPath) " + str(len(currentPath)) + ", max: " + str(maxApDeviation))
-#        newL2Path=possibleAPPath(copy.deepcopy(fromObj),copy.deepcopy(currentObj),copy.deepcopy(toObj),currentPath.copy())
-#        level2ApPathsList.append(newL2Path)
-
-def launchThread(currentObj,currentPath,fromBranch):
-    #print("Thread launched")
-    global autoPilotDistance, autoPilotStepLimit, level2ApPathsList, aplevel2PathedCoordinates
-    global totalThreads, threads
- 
-    
- 
-    print("currentObj: " + currentObj.getLabel())
-    
-    if len(currentPath) < (maxApDeviation):
-        #print("spawning possibleAPPath")
-        newL2Path=possibleAPPath(copy.deepcopy(currentObj),currentPath.copy(),fromBranch)
-        level2ApPathsList.append(newL2Path)
-    #else:
-        #print("NOT spawning possibleAPPath")
-    totalThreads = totalThreads - 1
-     
-class possibleAPPath:
-    def __init__(self, current_location, current_path, from_branch):
-        self.branch_id = get_branch_id()
-        self.current_location = spacialObject(
-            current_location.name,
-            current_location.x,
-            current_location.y,
-            current_location.z
-        )
-        self.recorded_path = copy.deepcopy(current_path)
-        self.branch_gets_to_destination = False
-
-        dest_file = f"logs/{requestId}_{from_branch}_{branchCounter}.txt"
-        self._log_initial_state(dest_file, current_location, from_branch)
-
-        if self._is_at_destination(current_location):
-            self._handle_destination_reached(dest_file)
-            return
-
-        self._log(f"Spawned branch {self.branch_id}, {self.current_location.getLabel()}, steps: {len(self.recorded_path)}", dest_file)
-
-        if self._should_lower_to_reach_destination():
-            self.check_location(self.current_location.x, self.current_location.y, self.current_location.z - 1, dest_file)
-        elif self.current_location.z < defaultFlightHeight:
-            self._log("Drone is below ideal flight height, raising", dest_file)
-            self.check_location(self.current_location.x, self.current_location.y, self.current_location.z + 1, dest_file)
-            return
-
-        # Explore horizontal directions
-        self._explore_adjacent(dest_file)
-
-        global currentBadPaths
-        currentBadPaths += 1
-
-    def _is_at_destination(self, location):
-        return (
-            location.x == autoPilotDestination.x and
-            location.y == autoPilotDestination.y and
-            location.z == autoPilotDestination.z
-        )
-
-    def _handle_destination_reached(self, dest_file):
-        global currentGoodPaths, mostEfficient, mostEfficientRoute
-        print("Made it to destination")
-        self.branch_gets_to_destination = True
-        currentGoodPaths += 1
-        self._log("Made it to destination!", dest_file)
-
-        mostEfficient = 99999999
-        mostEfficientRoute = []
-
-        if len(self.recorded_path) < mostEfficient:
-            mostEfficient = len(self.recorded_path)
-            mostEfficientRoute = self.recorded_path
-
-    def _log_initial_state(self, dest_file, current_location, from_branch):
-        self._log(f"Starting branch, launched from {from_branch}", dest_file)
-        self._log(f"Drone location: {drone.getLabel()}", dest_file)
-        self._log(f"Current location: {current_location.getLabel()}", dest_file)
-        self._log(f"AutoPilot Destination: {autoPilotDestination.getLabel()}", dest_file)
-        self._log("This path:", dest_file)
-        self._log(self.current_location.getLabel(), dest_file)
-        for loc in self.recorded_path:
-            self._log(loc.getLabel(), dest_file)
-
-    def _explore_adjacent(self, dest_file):
-        directions = [
-            (1, 0, 0), (-1, 0, 0),
-            (0, 1, 0), (0, -1, 0)
-        ]
-        for dx, dy, dz in directions:
-            self.check_location(
-                self.current_location.x + dx,
-                self.current_location.y + dy,
-                self.current_location.z + dz,
-                dest_file
-            )
-
-    def _should_lower_to_reach_destination(self):
-        return (
-            self.current_location.x == autoPilotDestination.x and
-            self.current_location.y == autoPilotDestination.y and
-            self.current_location.z > autoPilotDestination.z
-        )
-
-    def _log(self, msg, dest_file):
-        filesystem.appendFile(dest_file, msg + "\n")
-
-    def check_location(self, x, y, z, dest_file):
-        new_path = copy.deepcopy(self.current_location)
-        new_path.x, new_path.y, new_path.z = x, y, z
-        new_path.id = len(self.recorded_path) + 1
-        new_path.note = (
-            f"Added by BranchId: {self.branch_id}, "
-            f"Distance to destination: {collisiondetection.distanceBetweenObjects(new_path, autoPilotDestination)}, "
-            f"maxApDeviation: {maxApDeviation}"
-        )
-
-        self._log(f"Checking location {new_path.getLabel()}", dest_file)
-
-        if self._has_visited(new_path):
-            self._log(f"Already moved to this location in this branch {new_path.getLabel()}", dest_file)
-            global currentBadPaths
-            currentBadPaths += 1
-            return
-
-        if not self._is_in_bounds(new_path, dest_file):
-            return
-
-        self.recorded_path.append(new_path)
-
-        check_obj = collisiondetection.getObjectByCoordinate(new_path.x, new_path.y, new_path.z, knownObjs)
-        if check_obj is None:
-            self._log(f"Adding possible path {new_path.getLabel()}", dest_file)
-            addPossiblePath(new_path, self.recorded_path, self.branch_id)
-        else:
-            self._log(f"Hit object {check_obj.getLabel()}", dest_file)
-
-    def _has_visited(self, location):
-        return any(
-            loc.x == location.x and loc.y == location.y and loc.z == location.z
-            for loc in self.recorded_path
-        )
-
-    def _is_in_bounds(self, location, dest_file):
-        if location.x < 1 or location.y < 1 or location.z < 1:
-            self._log(f"Out of bounds {location.getLabel()}", dest_file)
-            return False
-        if location.x > world.x or location.y > world.y or location.z > world.z:
-            self._log(f"Out of bounds {location.getLabel()}", dest_file)
-            return False
-        if not (viewPort.x <= location.x <= viewPort.x2() and viewPort.y <= location.y <= viewPort.y2()):
-            self._log(f"Out of viewport bounds {location.getLabel()}", dest_file)
-            return False
-        self._log(f"viewPort: {viewPort.getLabel()}", dest_file)
-        return True
-
-
 
 def run(server_class=HTTPServer, handler_class=webRequestHandler, port=8001):
    server_address = ('', port)
@@ -984,3 +1013,4 @@ def run(server_class=HTTPServer, handler_class=webRequestHandler, port=8001):
   
 if __name__ == '__main__':
    run()
+
