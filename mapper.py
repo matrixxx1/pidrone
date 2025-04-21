@@ -22,6 +22,8 @@ useThreads=False
 threads = []
 totalThreads = 0
 
+preventDuplicateBranches=False
+
 sys.setrecursionlimit(5000)
 branchCounter = 0
 
@@ -30,7 +32,7 @@ mostEfficient = 99999999
 mostEfficientRoute = []
 
 autoPilotDistance=0
-autoPilotStepLimit=3 # this ensures that inneficient routes are not considered.
+autoPilotStepLimit=1.2 # this ensures that inneficient routes are not considered.
 
 maxApDeviation=0
 #If the steps are more than 2x the distance, drop the branch
@@ -378,7 +380,7 @@ def seedWorld():
      
 seedWorld()
 
-def handleDroneMovement():
+def perform_ap_level_1():
     
        
         
@@ -672,7 +674,7 @@ class webRequestHandler(BaseHTTPRequestHandler):
         response_content=" <html><head><script type='text/javascript' src='/html/drone.js'></script><link rel='stylesheet' href='/html/styles.css'> " + renderScripts(self) + renderStyles(self)  + "</head><body> "
          
         if (action != "getmap"):
-            handleDroneMovement()
+            perform_ap_level_1()
             response_content +=  renderWorld(self)  + renderMap(self) 
         else:
             response_content =  response_content + renderMap(self) 
@@ -687,13 +689,12 @@ def makeViewPort():
     # Create initial viewport
     viewPort = spacialObject("viewPort", 1, 1, 1)
 
-    # Calculate X range
-    viewPort.x = min(drone.x, world.x)
-    viewPort.width = abs(drone.x - world.x)
+    # Calculate XY range
+    viewPort.x = min(drone.x, autoPilotDestination.x)
+    viewPort.y = min(drone.y, autoPilotDestination.y)
 
-    # Calculate Y range
-    viewPort.y = min(drone.y, world.y)
-    viewPort.height = abs(drone.y - world.y)
+    viewPort.height = max(drone.x, autoPilotDestination.x) - viewPort.x
+    viewPort.width = max(drone.y, autoPilotDestination.y) - viewPort.y      
 
     # Ensure minimum margins
     viewPort.x = max(1, viewPort.x - 3)
@@ -739,7 +740,7 @@ def performAPLevel2():
     else:
         
         autoPilotDistance = collisiondetection.distanceBetweenObjects(drone,autoPilotDestination)
-        maxApDeviation=autoPilotStepLimit * autoPilotDistance
+        maxApDeviation=int(autoPilotStepLimit * autoPilotDistance)
         
         newPath = spacialObject("ap",drone.x, drone.y, drone.z)
         startPath=[]
@@ -787,7 +788,7 @@ def addPossiblePath(co,cp, fb):
     fromBranch = fb
     
     global threads, totalThreads, useThreads
-    global autoPilotDistance, autoPilotStepLimit, aplevel2PathedCoordinates, maxApDeviation
+    global autoPilotDistance, autoPilotStepLimit, aplevel2PathedCoordinates, maxApDeviation,preventDuplicateBranches
     
     if len(currentPath) < (maxApDeviation):
         if (useThreads==True):        
@@ -799,12 +800,13 @@ def addPossiblePath(co,cp, fb):
             return 0
         else:
             alreadMapped=False
-            for eachLoc in aplevel2PathedCoordinates:
-                if (eachLoc.x==currentObj.x and eachLoc.y==currentObj.y and eachLoc.z==currentObj.z):
-                    alreadMapped=True
-                    #print("Preventing duplicate branch Dest " + currentObj.getLabel() + " current: " + eachLoc.getLabel() )
-                    return
-            
+            if (preventDuplicateBranches==True):                
+                for eachLoc in aplevel2PathedCoordinates:
+                    if (eachLoc.x==currentObj.x and eachLoc.y==currentObj.y and eachLoc.z==currentObj.z):
+                        alreadMapped=True
+                        #print("Preventing duplicate branch Dest " + currentObj.getLabel() + " current: " + eachLoc.getLabel() )
+                        return
+                
             if (alreadMapped==False):    
                 #print("Novel branch " + currentObj.getLabel())
                 aplevel2PathedCoordinates.append(currentObj)
@@ -814,7 +816,7 @@ def addPossiblePath(co,cp, fb):
                 #print("NOT spawning possibleAPPath")
         
 #    else:
-#        print("NOT spawning possibleAPPath, out of efficiency allowance")
+  #      print("NOT spawning possibleAPPath, out of efficiency allowance: len(currentPath) " + str(len(currentPath)) + ", max: " + str(maxApDeviation))
 #        newL2Path=possibleAPPath(copy.deepcopy(fromObj),copy.deepcopy(currentObj),copy.deepcopy(toObj),currentPath.copy())
 #        level2ApPathsList.append(newL2Path)
 
@@ -827,7 +829,7 @@ def launchThread(currentObj,currentPath,fromBranch):
  
     print("currentObj: " + currentObj.getLabel())
     
-    if len(currentPath) < (autoPilotStepLimit * autoPilotDistance):
+    if len(currentPath) < (maxApDeviation):
         #print("spawning possibleAPPath")
         newL2Path=possibleAPPath(copy.deepcopy(currentObj),currentPath.copy(),fromBranch)
         level2ApPathsList.append(newL2Path)
